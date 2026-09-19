@@ -15,5 +15,5 @@ GEMINI_MODEL = "gemini-2.5-flash"
 [[d1_databases]]
 binding = "DB"
 database_name = "timex"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "0cb8909f-3684-46a8-baa4-9a122995e201"
 migrations_dir = "migrations"
