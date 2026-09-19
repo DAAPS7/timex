@@ -3,6 +3,7 @@ import { addDays, startOfWeek, todayLocal, weekDates, weekdayOf, WEEKDAYS_SHORT,
 import { REASON_TEXT } from '../../../shared/reasons'
 import type { CalendarEvent, ScheduledItem } from '../../../shared/domain'
 import { Button, Icon, Modal } from '../../components/ui'
+import { useAutoPlan } from '../../hooks/useAutoPlan'
 import { usePlanning } from '../../hooks/usePlanning'
 import { useStore } from '../../state/store'
 import { PlanPanel } from '../planning/PlanPanel'
@@ -16,13 +17,14 @@ const monthName = (d: string) => {
 
 export function CalendarPage() {
   const { state, dispatch } = useStore()
-  const { generate, busy, error } = usePlanning()
+  const { generate, replanAffected, busy, error } = usePlanning()
   const today = todayLocal()
   const [weekStart, setWeekStart] = useState(startOfWeek(today))
   const [selectedDay, setSelectedDay] = useState(weekDates(weekStart).includes(today) ? today : weekStart)
   const [editing, setEditing] = useState<CalendarEvent | 'new' | null>(null)
   const [viewing, setViewing] = useState<ScheduledItem | null>(null)
 
+  useAutoPlan(weekStart) // every week gets a proposed plan when it has none
   const plan = state.plans[weekStart]
   const goToWeek = (delta: number) => {
     const next = addDays(weekStart, delta * 7)
@@ -30,6 +32,17 @@ export function CalendarPage() {
     setSelectedDay(weekDates(next).includes(today) ? today : next)
   }
   const activity = viewing && state.activities.find((a) => a.id === viewing.activityId)
+
+  // A new, edited or removed event changes the week: save it, then revise the affected plans keeping what still works.
+  const saveEvents = (events: CalendarEvent[]) => {
+    events.forEach((event) => dispatch({ type: 'upsertEvent', event }))
+    const ids = new Set(events.map((e) => e.id))
+    void replanAffected({ ...state, events: [...state.events.filter((e) => !ids.has(e.id)), ...events] })
+  }
+  const removeEvent = (id: string) => {
+    dispatch({ type: 'deleteEvent', id })
+    void replanAffected({ ...state, events: state.events.filter((e) => e.id !== id) })
+  }
 
   return (
     <>
@@ -65,6 +78,7 @@ export function CalendarPage() {
       <div className="legend" style={{ margin: '14px 4px 18px' }}>
         <span><i style={{ background: 'var(--text-2)' }} />Compromisso fixo</span>
         <span><i style={{ background: 'var(--accent)' }} />Atividade planeada</span>
+        <span><i style={{ border: '1px dashed var(--amber)' }} />Transporte</span>
         <span><i style={{ border: '1.5px solid var(--sep)' }} />Tempo livre</span>
       </div>
 
@@ -72,15 +86,15 @@ export function CalendarPage() {
         <PlanPanel plan={plan} activities={state.activities} busy={busy}
           onAccept={() => dispatch({ type: 'acceptPlan', weekStart })} onRegenerate={() => generate(weekStart)} />
       ) : (
-        <div className="card muted">Ainda não há plano para esta semana. Carrega em <b>Gerar plano</b> para o motor encaixar as tuas atividades no tempo livre.</div>
+        <div className="card muted">Ainda não há plano para esta semana. Adiciona atividades para o motor as encaixar no tempo livre.</div>
       )}
 
       {editing && (
         <EventForm
           event={editing === 'new' ? undefined : editing} defaultDate={selectedDay}
           onClose={() => setEditing(null)}
-          onSave={(event) => { dispatch({ type: 'upsertEvent', event }); setEditing(null) }}
-          onDelete={editing === 'new' ? undefined : () => { dispatch({ type: 'deleteEvent', id: editing.id }); setEditing(null) }}
+          onSave={(events) => { saveEvents(events); setEditing(null) }}
+          onDelete={editing === 'new' ? undefined : () => { removeEvent(editing.id); setEditing(null) }}
         />
       )}
 

@@ -15,7 +15,7 @@ import {
 
 const HELP =
   'Posso criar atividades ("quero ir ao ginásio 4 vezes por semana, 1 hora"), objetivos ("tenho um exame de Algoritmos em 3 semanas"), ' +
-  'planear a tua semana ("planeia a minha semana"), ver se algo cabe ("consigo encaixar 3 horas de programação?") e explicar o plano ("porque…?").'
+  'planear a tua semana ("planeia a minha semana"), aproveitar o transporte ("como aproveito o transporte?"), ver se algo cabe ("consigo encaixar 3 horas de programação?") e explicar o plano ("porque…?").'
 
 const toDraft = (a: ParsedActivity) => ({ ...a, preferredDays: [] as number[] })
 const dayName = (date: string) => WEEKDAYS_LONG[weekdayOf(date)]
@@ -56,6 +56,13 @@ export const ruleBasedProvider: AIProvider = {
     const text = normalize(message)
     const activities = tools.call('get_activities') as Activity[]
     const names = new Map(activities.map((a) => [a.id, a.name]))
+
+    if (INTENTS.transport.test(text)) {
+      const { commute } = tools.call('get_routine') as { commute: { mode: string; minutesPerDay: number; ideasToUseTheTime: string[] } | null }
+      if (!commute) return 'Ainda não definiste o teu transporte. Diz-me o modo e o tempo por dia em Definições e eu sugiro como o aproveitar.'
+      const ideas = commute.ideasToUseTheTime.map((t) => `• ${t}`).join('\n')
+      return `Perdes cerca de ${formatDuration(commute.minutesPerDay)} por dia (${commute.mode}). Ideias:\n${ideas}`
+    }
 
     if (INTENTS.explain.test(text)) return explain(tools.call('explain_plan') as ScheduledItem[], names, text)
 

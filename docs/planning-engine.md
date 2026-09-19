@@ -490,3 +490,9 @@ PostgreSQL
 Avoid infrastructure that is unnecessary for the prototype.
 
 Scaling architecture should only be introduced when actual requirements justify it.
+
+## Routine, commute and stable replanning (engine 0.2.0)
+
+- Availability = waking window − fixed/one-off events − commute blocks (`computeCommute`). See ADR 004.
+- `previousItems` makes the run *stable*: valid sessions are kept, only disturbed ones move, and `changes` explains the difference.
+- Result additions: `commuteBlocks`, `changes` (both optional).

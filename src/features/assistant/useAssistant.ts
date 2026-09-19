@@ -33,9 +33,11 @@ export function useAssistant() {
     dispatch({ type: 'markHandled', messageId: m.id })
     for (const p of m.proposals ?? []) {
       if (p.type === 'create_activity') dispatch({ type: 'upsertActivity', activity: p.payload })
-      else dispatch({ type: 'upsertGoal', goal: p.payload })
+      else if (p.type === 'create_goal') dispatch({ type: 'upsertGoal', goal: p.payload })
+      else dispatch({ type: 'upsertEvent', event: p.payload })
     }
-    await generate(weekStart, applyProposals(state, m.proposals ?? []))
+    // a plan is already on screen: keep what still works and move only what the new items disturb
+    await generate(weekStart, applyProposals(state, m.proposals ?? []), { stable: true })
   }
 
   const adoptPlan = (m: ChatMessage) => {

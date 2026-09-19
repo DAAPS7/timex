@@ -8,17 +8,18 @@ const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:mm')
 export const prioritySchema = z.enum(['low', 'medium', 'high', 'critical'])
 export type Priority = z.infer<typeof prioritySchema>
 
-export const calendarEventSchema = z
-  .object({
-    id: z.string().min(1).max(64),
-    title: z.string().min(1).max(120),
-    date, // first occurrence
-    start: time,
-    end: time,
-    weekly: z.boolean().default(false), // repeats every week on the same weekday
+const calendarEventBase = z.object({
+  id: z.string().min(1).max(64),
+  title: z.string().min(1).max(120),
+  date, // first occurrence
+  start: time,
+  end: time,
+  weekly: z.boolean().default(false), // repeats every week on the same weekday
     location: z.string().max(120).optional(),
-  })
-  .refine((e) => e.end > e.start, { message: 'end must be after start', path: ['end'] })
+})
+const endAfterStart = { message: 'end must be after start', path: ['end'] }
+export const calendarEventSchema = calendarEventBase.refine((e) => e.end > e.start, endAfterStart)
+export const calendarEventDraftSchema = calendarEventBase.omit({ id: true }).refine((e) => e.end > e.start, endAfterStart)
 export type CalendarEvent = z.infer<typeof calendarEventSchema>
 
 export const activitySchema = z.object({
@@ -44,26 +45,26 @@ export const goalSchema = z.object({
 })
 export type Goal = z.infer<typeof goalSchema>
 
+export const transportModeSchema = z.enum(['walk', 'bike', 'bus', 'train', 'car'])
+export type TransportMode = z.infer<typeof transportModeSchema>
+
+// Daily round-trip time lost in transport. The engine reserves it before the first / after the last fixed commitment.
+export const commuteSchema = z.object({
+  mode: transportModeSchema,
+  minutesPerDay: z.number().int().min(0).max(300),
+})
+export type Commute = z.infer<typeof commuteSchema>
+
 export const preferencesSchema = z.object({
   timezone: z.string().min(1).max(64),
   dayStart: time, // start of the waking day; everything outside [dayStart, dayEnd] is sleep/unavailable
   dayEnd: time,
   minBreakMinutes: z.number().int().min(0).max(120),
   maxDailyPlannedMinutes: z.number().int().min(60).max(960),
+  commute: commuteSchema.optional(),
+  setupDone: z.boolean().optional(), // the guided setup (fixed schedule, sleep, transport, activities) was finished or skipped
 })
 export type Preferences = z.infer<typeof preferencesSchema>
-
-export const planningInputSchema = z.object({
-  today: date,
-  weekStart: date,
-  events: z.array(calendarEventSchema).max(500),
-  activities: z.array(activitySchema).max(100),
-  goals: z.array(goalSchema).max(100),
-  preferences: preferencesSchema,
-})
-export type PlanningInput = z.infer<typeof planningInputSchema>
-
-// ---- Planning output ----
 
 export const reasonCodeSchema = z.enum([
   'HIGH_PRIORITY',
@@ -86,6 +87,21 @@ export const scheduledItemSchema = z.object({
 })
 export type ScheduledItem = z.infer<typeof scheduledItemSchema>
 
+export const planningInputSchema = z.object({
+  today: date,
+  weekStart: date,
+  events: z.array(calendarEventSchema).max(500),
+  activities: z.array(activitySchema).max(100),
+  goals: z.array(goalSchema).max(100),
+  preferences: preferencesSchema,
+  // The plan being revised: sessions that are still valid are kept, only the affected ones move (stable replanning).
+  previousItems: z.array(scheduledItemSchema).max(500).optional(),
+})
+export type PlanningInput = z.infer<typeof planningInputSchema>
+
+// ---- Planning output ----
+
+
 export type ConflictCode = 'INSUFFICIENT_AVAILABLE_TIME' | 'DEADLINE_UNACHIEVABLE'
 
 export interface Conflict {
@@ -104,6 +120,21 @@ export interface Warning {
 
 export type Feasibility = 'fully_feasible' | 'partially_feasible' | 'infeasible'
 
+export interface CommuteBlock {
+  date: string
+  start: string
+  end: string
+  mode: TransportMode
+}
+
+// What a stable replan did to the previous plan, so the change can be shown and explained.
+export interface PlanChanges {
+  kept: number
+  moved: { from: ScheduledItem; to: ScheduledItem }[]
+  dropped: ScheduledItem[] // could not be placed again
+  added: ScheduledItem[] // new sessions with no previous counterpart
+}
+
 export interface PlanningResult {
   engineVersion: string
   status: Feasibility
@@ -114,6 +145,8 @@ export interface PlanningResult {
   conflicts: Conflict[]
   warnings: Warning[]
   availableMinutesByDay: Record<string, number>
+  commuteBlocks?: CommuteBlock[]
+  changes?: PlanChanges // only when the plan was built from previousItems
 }
 
 export type PlanStatus = 'proposed' | 'accepted' | 'modified'
@@ -133,6 +166,7 @@ export type ProposedAction =
   // Upserts: if the id already exists in the user's data, the client updates it instead of duplicating it.
   | { type: 'create_activity'; summary: string; payload: Activity }
   | { type: 'create_goal'; summary: string; payload: Goal }
+  | { type: 'create_event'; summary: string; payload: CalendarEvent }
 
 export interface AssistantReply {
   reply: string

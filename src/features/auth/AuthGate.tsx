@@ -4,7 +4,7 @@ import { Button, Card } from '../../components/ui'
 import { authApi, stateApi } from '../../services/api/client'
 import { clearLegacyState, loadLegacyState } from '../../services/api/storage'
 import { normalizeState } from '../../state/normalize'
-import { seedState } from '../../state/seed'
+import { emptyState } from '../../state/seed'
 import { SessionCtx } from '../../state/session'
 import { StoreProvider, type AppState } from '../../state/store'
 import { AuthPage } from './AuthPage'
@@ -15,10 +15,10 @@ type Phase =
   | { name: 'signedOut' }
   | { name: 'ready'; user: User; initial: AppState }
 
-/** New account: import data left in this browser by the pre-accounts prototype, otherwise start from the demo data. */
+/** New account: import data left in this browser by the pre-accounts prototype, otherwise start empty (the setup wizard fills it in). */
 async function firstState(): Promise<AppState> {
   const legacy = loadLegacyState()
-  const state = legacy ? normalizeState(legacy) : seedState()
+  const state = legacy ? normalizeState(legacy) : emptyState()
   await stateApi.save(state)
   if (legacy) clearLegacyState()
   return state

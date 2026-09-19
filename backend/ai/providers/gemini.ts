@@ -43,6 +43,9 @@ function summarizePlan(plan: PlanningResult) {
     unscheduledMinutes: plan.unscheduledMinutes,
     conflicts: plan.conflicts,
     warnings: plan.warnings,
+    ...(plan.changes
+      ? { changes: { kept: plan.changes.kept, moved: plan.changes.moved.map(({ from, to }) => ({ activityId: from.activityId, from: `${from.date} ${from.start}`, to: `${to.date} ${to.start}` })), dropped: plan.changes.dropped.map((i) => ({ activityId: i.activityId, was: `${i.date} ${i.start}` })) } }
+      : {}),
     sessions: plan.scheduledItems.map(({ activityId, date, start, end }) => ({ activityId, date, start, end })),
   }
 }

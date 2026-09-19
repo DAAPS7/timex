@@ -1,6 +1,7 @@
 import { occursOn } from '../../../shared/events'
-import { toMinutes, weekDates } from '../../../shared/time'
-import type { CalendarEvent, PlanningInput, Warning } from '../../../shared/domain'
+import { wakingWindow } from '../../../shared/routine'
+import { toHHMM, toMinutes, weekDates } from '../../../shared/time'
+import type { CalendarEvent, CommuteBlock, PlanningInput, Warning } from '../../../shared/domain'
 
 export interface Interval {
   start: number // minutes from midnight
@@ -65,18 +66,44 @@ export function detectOverlappingEvents(events: CalendarEvent[], dates: string[]
 }
 
 /**
- * Availability is derived, never stored: waking hours minus fixed events.
+ * Commute time: on days with recurring (fixed) commitments, half of the daily transport time is reserved right
+ * before the first one and the other half right after the last one, kept inside waking hours.
+ */
+export function computeCommute(input: PlanningInput, dates: string[]): CommuteBlock[] {
+  const { commute, dayStart, dayEnd } = input.preferences
+  if (!commute || commute.minutesPerDay <= 0) return []
+  const { start: wake, end: bed } = wakingWindow({ dayStart, dayEnd })
+  const blocks: CommuteBlock[] = []
+  for (const date of dates) {
+    if (date < input.today) continue
+    const fixed = input.events.filter((e) => e.weekly && occursOn(e, date))
+    if (fixed.length === 0) continue
+    const first = Math.min(...fixed.map((e) => toMinutes(e.start)))
+    const last = Math.max(...fixed.map((e) => toMinutes(e.end)))
+    const before = Math.ceil(commute.minutesPerDay / 2)
+    const after = commute.minutesPerDay - before
+    const go = { start: Math.max(wake, first - before), end: first }
+    const back = { start: last, end: Math.min(bed, last + after) }
+    for (const b of [go, back]) {
+      if (b.end > b.start) blocks.push({ date, start: toHHMM(b.start), end: toHHMM(b.end), mode: commute.mode })
+    }
+  }
+  return blocks
+}
+
+/**
+ * Availability is derived, never stored: waking hours minus fixed events and commute time.
  * Days before `today` are unavailable (nothing is planned in the past).
  */
-export function computeAvailability(input: PlanningInput): DayIntervals {
+export function computeAvailability(input: PlanningInput, commute: CommuteBlock[] = computeCommute(input, weekDates(input.weekStart))): DayIntervals {
   const { weekStart, today, events, preferences } = input
   const dates = weekDates(weekStart)
   const busy = expandEvents(events, dates)
-  const waking: Interval = { start: toMinutes(preferences.dayStart), end: toMinutes(preferences.dayEnd) }
+  for (const b of commute) busy[b.date].push({ start: toMinutes(b.start), end: toMinutes(b.end) })
+  const waking: Interval = wakingWindow(preferences)
   const free: DayIntervals = {}
   for (const date of dates) {
     free[date] = date < today || waking.end <= waking.start ? [] : subtractIntervals([waking], busy[date])
   }
   return free
 }
-

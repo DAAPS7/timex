@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { daysBetween, formatDuration, startOfWeek, todayLocal, toMinutes, WEEKDAYS_LONG, weekdayOf } from '../../../shared/time'
 import { occursOn } from '../../../shared/events'
+import { TRANSPORT_LABEL, TRANSPORT_TIPS } from '../../../shared/transport'
 import { Button, Card, CardHead, Empty, Icon } from '../../components/ui'
 import type { Page } from '../../components/layout/AppShell'
 import { usePlanning } from '../../hooks/usePlanning'
@@ -35,11 +36,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const plannedToday = todayItems.reduce((n, i) => n + toMinutes(i.end) - toMinutes(i.start), 0)
   const rows: Row[] = [
     ...state.events.filter((e) => occursOn(e, today)).map((e) => ({ key: e.id, start: e.start, end: e.end, title: e.title, color: 'var(--text-2)', fixed: true })),
+    ...(plan?.result.commuteBlocks ?? []).filter((b) => b.date === today).map((b) => ({ key: `commute-${b.start}`, start: b.start, end: b.end, title: `Transporte · ${TRANSPORT_LABEL[b.mode]}`, color: 'var(--amber)', fixed: true })),
     ...todayItems.map((i) => ({ key: i.id, start: i.start, end: i.end, title: names.get(i.activityId) ?? 'Atividade', color: colorFor(i.activityId), fixed: false })),
   ].sort((a, b) => a.start.localeCompare(b.start))
 
   const upcoming = (plan?.result.scheduledItems ?? []).filter((i) => i.date > today).slice(0, 4)
   const goals = [...state.goals].sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 3)
+  const commute = state.preferences.commute
   const hour = new Date().getHours()
 
   const ask = (e: React.FormEvent) => {
@@ -105,6 +108,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
               ))}
             </div>
           </Card>
+          {commute && commute.minutesPerDay > 0 && (
+            <Card>
+              <CardHead title="Aproveitar o transporte" />
+              <p className="small muted">{TRANSPORT_LABEL[commute.mode]} · {formatDuration(commute.minutesPerDay)} por dia</p>
+              <ul className="tip-list small">{TRANSPORT_TIPS[commute.mode].slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
+            </Card>
+          )}
           <Card>
             <CardHead title="Objetivos" />
             {goals.length === 0 && <Empty>Sem objetivos.</Empty>}

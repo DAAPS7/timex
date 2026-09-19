@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { splitWeeklyMinutes } from '../../../shared/sessions'
 import { WEEKDAYS_SHORT, formatDuration } from '../../../shared/time'
 import type { Activity, Goal, Priority } from '../../../shared/domain'
 import { Button, Field, Modal, Segmented } from '../../components/ui'
@@ -17,8 +18,8 @@ interface Props {
 
 export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Props) {
   const [name, setName] = useState(activity?.name ?? '')
-  const [sessions, setSessions] = useState(activity?.sessionsPerWeek ?? 3)
-  const [minutes, setMinutes] = useState(activity?.sessionMinutes ?? 60)
+  const [weeklyHours, setWeeklyHours] = useState(activity ? (activity.sessionsPerWeek * activity.sessionMinutes) / 60 : 3)
+  const [preferredSession, setPreferredSession] = useState(activity?.sessionMinutes ?? 60)
   const [priority, setPriority] = useState<Priority>(activity?.priority ?? 'medium')
   const [days, setDays] = useState<number[]>(activity?.preferredDays ?? [])
   const [prefStart, setPrefStart] = useState(activity?.preferredStart ?? '')
@@ -27,7 +28,9 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
   const [goalId, setGoalId] = useState(activity?.goalId ?? '')
 
   const windowOk = (prefStart === '') === (prefEnd === '') && (prefStart === '' || prefEnd > prefStart)
-  const valid = name.trim() !== '' && sessions >= 1 && minutes >= 15 && windowOk
+  // The user says how many hours per week; sessions are derived from the preferred session length.
+  const { sessionsPerWeek: sessions, sessionMinutes: minutes } = splitWeeklyMinutes(weeklyHours * 60, preferredSession)
+  const valid = name.trim() !== '' && weeklyHours >= 0.25 && preferredSession >= 15 && windowOk
 
   const save = () =>
     onSave({
@@ -47,10 +50,10 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
     <Modal title={activity ? 'Editar atividade' : 'Nova atividade'} onClose={onClose}>
       <Field label="Nome"><input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} placeholder="Ginásio, Estudar…" /></Field>
       <div className="two-col">
-        <Field label="Sessões por semana"><input className="input" type="number" min={1} max={14} value={sessions} onChange={(e) => setSessions(Number(e.target.value))} /></Field>
-        <Field label="Minutos por sessão"><input className="input" type="number" min={15} max={480} step={15} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} /></Field>
+        <Field label="Horas por semana"><input className="input" type="number" min={0.25} max={40} step={0.25} value={weeklyHours} onChange={(e) => setWeeklyHours(Number(e.target.value))} /></Field>
+        <Field label="Duração de cada sessão (min)"><input className="input" type="number" min={15} max={480} step={15} value={preferredSession} onChange={(e) => setPreferredSession(Number(e.target.value))} /></Field>
       </div>
-      <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>Total pedido: {formatDuration(sessions * minutes)} por semana</p>
+      <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>Fica em {sessions} {sessions === 1 ? 'sessão' : 'sessões'} de {formatDuration(minutes)} ({formatDuration(sessions * minutes)} por semana)</p>
       <Field label="Prioridade"><Segmented options={PRIORITIES} value={priority} onChange={setPriority} /></Field>
       <Field label="Dias preferidos (opcional)">
         <div className="segmented">

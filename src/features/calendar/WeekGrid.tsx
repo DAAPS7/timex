@@ -1,6 +1,8 @@
 import { toMinutes, formatDuration, weekDates, WEEKDAYS_SHORT } from '../../../shared/time'
 import { occursOn } from '../../../shared/events'
+import { wakingWindow } from '../../../shared/routine'
 import type { Activity, CalendarEvent, Plan, ScheduledItem } from '../../../shared/domain'
+import { TRANSPORT_LABEL } from '../../../shared/transport'
 import { colorFor } from '../../utils/colors'
 
 interface Props {
@@ -21,8 +23,9 @@ const height = (from: number, to: number) => `calc(${(to - from) / 60} * var(--h
 
 /** Pure presentation: draws fixed events, planned items and (implicitly) free time for one week. */
 export function WeekGrid({ weekStart, today, selectedDay, dayStart, dayEnd, events, activities, plan, onEvent, onItem }: Props) {
-  const startHour = Math.floor(toMinutes(dayStart) / 60)
-  const endHour = Math.ceil(toMinutes(dayEnd) / 60)
+  const window = wakingWindow({ dayStart, dayEnd })
+  const startHour = Math.floor(window.start / 60)
+  const endHour = Math.ceil(window.end / 60)
   const startMin = startHour * 60
   const hours = endHour - startHour
   const names = new Map(activities.map((a) => [a.id, a.name]))
@@ -54,6 +57,12 @@ export function WeekGrid({ weekStart, today, selectedDay, dayStart, dayEnd, even
                   style={{ top: top(Math.max(toMinutes(e.start), startMin), startMin), height: height(Math.max(toMinutes(e.start), startMin), toMinutes(e.end)) }}>
                   <b>{e.title}</b>{e.start}–{e.end}
                 </button>
+              ))}
+              {(plan?.result.commuteBlocks ?? []).filter((b) => b.date === date).map((b) => (
+                <div key={`${b.start}-commute`} className="block commute" title={TRANSPORT_LABEL[b.mode]}
+                  style={{ top: top(Math.max(toMinutes(b.start), startMin), startMin), height: height(Math.max(toMinutes(b.start), startMin), toMinutes(b.end)) }}>
+                  <b>{TRANSPORT_LABEL[b.mode]}</b>{b.start}–{b.end}
+                </div>
               ))}
               {items.map((i) => (
                 <button key={i.id} className="block planned" onClick={() => onItem(i)}

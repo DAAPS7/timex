@@ -106,5 +106,6 @@ export const INTENTS = {
   fit: /\b(posso|consigo|cabe|caber|encaixar|encaixo|can i|could i|fit)\b/,
   goal: /\b(exame|exam|prova|teste|prazo|deadline|entrega)\b/,
   plan: /\b(planeia|planear|planeamento|plano|plan|organiza|organizar|gera|gerar|generate)\b/,
+  transport: /\b(transporte|transportes|deslocacao|deslocacoes|autocarro|comboio|metro|commute|viagem)\b/,
   availability: /\b(livre|disponivel|disponibilidade|available|free)\b/,
 }

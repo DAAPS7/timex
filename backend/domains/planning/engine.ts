@@ -1,8 +1,9 @@
-import { toHHMM, weekDates } from '../../../shared/time'
+import { toHHMM, toMinutes, weekDates } from '../../../shared/time'
 import type {
   Activity,
   Conflict,
   Feasibility,
+  PlanChanges,
   PlanningInput,
   PlanningResult,
   Priority,
@@ -11,6 +12,7 @@ import type {
 } from '../../../shared/domain'
 import {
   computeAvailability,
+  computeCommute,
   detectOverlappingEvents,
   subtractIntervals,
   sumMinutes,
@@ -19,7 +21,7 @@ import {
 import { scoreCandidate, type Candidate, type PlacedSlot } from './scoring'
 import { SCORING } from './scoringConfig'
 
-export const ENGINE_VERSION = '0.1.0'
+export const ENGINE_VERSION = '0.2.0'
 
 const PRIORITY_RANK: Record<Priority, number> = { low: 0, medium: 1, high: 2, critical: 3 }
 const STEP = SCORING.slotStepMinutes
@@ -73,7 +75,8 @@ function candidatesFor(free: DayIntervals, dates: string[], duration: number, lo
 export function generatePlan(input: PlanningInput): PlanningResult {
   const dates = weekDates(input.weekStart)
   const lastDate = dates[dates.length - 1]
-  const free = computeAvailability(input)
+  const commuteBlocks = computeCommute(input, dates)
+  const free = computeAvailability(input, commuteBlocks)
   const originalFree = structuredClone(free)
   const availableMinutesByDay = Object.fromEntries(dates.map((d) => [d, sumMinutes(free[d])]))
   const breakMinutes = input.preferences.minBreakMinutes
@@ -85,14 +88,50 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   const conflicts: Conflict[] = []
   let requested = 0
 
+  function commitSlot(activityId: string, c: Candidate, item: Pick<ScheduledItem, 'reasons'> & { id?: string }) {
+    const pad = { start: c.start - breakMinutes, end: c.end + breakMinutes }
+    free[c.date] = subtractIntervals(free[c.date], [pad])
+    load[c.date] += c.end - c.start
+    placed.push({ activityId, ...c })
+    items.push({
+      id: item.id ?? `${activityId}:${c.date}:${toHHMM(c.start)}`,
+      activityId,
+      date: c.date,
+      start: toHHMM(c.start),
+      end: toHHMM(c.end),
+      reasons: item.reasons,
+    })
+  }
+
+  // Stable replanning: keep the sessions of the previous plan that are still valid (past ones always), move the rest.
+  const keptIds = new Set<string>()
+  const removed: ScheduledItem[] = []
+  const kept = new Map<string, { sessions: number; minutes: number }>()
+  const previous = [...(input.previousItems ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+  for (const prev of previous) {
+    const activity = input.activities.find((a) => a.id === prev.activityId)
+    const past = prev.date < input.today
+    const c: Candidate = { date: prev.date, start: toMinutes(prev.start), end: toMinutes(prev.end) }
+    const totals = kept.get(prev.activityId) ?? { sessions: 0, minutes: 0 }
+    const validLength = !!activity && c.end - c.start <= activity.sessionMinutes && c.end - c.start >= minSession(activity)
+    const fits = dates.includes(prev.date) && (free[prev.date] ?? []).some((iv) => iv.start <= c.start && iv.end >= c.end)
+    if (activity && validLength && totals.sessions < activity.sessionsPerWeek && (past || fits)) {
+      commitSlot(prev.activityId, c, prev)
+      keptIds.add(prev.id)
+      kept.set(prev.activityId, { sessions: totals.sessions + 1, minutes: totals.minutes + c.end - c.start })
+    } else if (!past) {
+      removed.push(prev)
+    }
+  }
+
   for (const plan of order(normalize(input))) {
     const { activity, priority, deadline } = plan
     const window = dates.filter((d) => !deadline || d <= deadline)
     const activityRequested = activity.sessionsPerWeek * activity.sessionMinutes
     requested += activityRequested
-    let scheduled = 0
+    let scheduled = kept.get(activity.id)?.minutes ?? 0
 
-    let sessions = 0
+    let sessions = kept.get(activity.id)?.sessions ?? 0
     while (sessions < activity.sessionsPerWeek && placeSession()) sessions++
 
     if (scheduled < activityRequested) {
@@ -119,26 +158,11 @@ export function generatePlan(input: PlanningInput): PlanningResult {
           })
           if (!best || s.score > best.score) best = { c, ...s } // ties keep the earliest candidate
         }
-        commit(best!.c, best!.reasons, duration < activity.sessionMinutes)
+        commitSlot(activity.id, best!.c, { reasons: duration < activity.sessionMinutes ? [...best!.reasons, 'SHORTENED'] : best!.reasons })
+        scheduled += duration
         return true
       }
       return false
-    }
-
-    function commit(c: Candidate, reasons: ReasonCode[], shortened: boolean) {
-      const pad = { start: c.start - breakMinutes, end: c.end + breakMinutes }
-      free[c.date] = subtractIntervals(free[c.date], [pad])
-      load[c.date] += c.end - c.start
-      scheduled += c.end - c.start
-      placed.push({ activityId: activity.id, ...c })
-      items.push({
-        id: `${activity.id}:${c.date}:${toHHMM(c.start)}`,
-        activityId: activity.id,
-        date: c.date,
-        start: toHHMM(c.start),
-        end: toHHMM(c.end),
-        reasons: shortened ? [...reasons, 'SHORTENED'] : reasons,
-      })
     }
   }
 
@@ -157,6 +181,21 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     conflicts,
     warnings: detectOverlappingEvents(input.events, dates),
     availableMinutesByDay,
+    commuteBlocks,
+    ...(input.previousItems ? { changes: describeChanges(items, keptIds, removed, input.today) } : {}),
   }
 }
 
+
+/** Pair each removed session with a new one of the same activity (a move); the rest were dropped or are new. */
+function describeChanges(items: ScheduledItem[], keptIds: Set<string>, removed: ScheduledItem[], today: string): PlanChanges {
+  const fresh = items.filter((i) => !keptIds.has(i.id))
+  const moved: PlanChanges['moved'] = []
+  const dropped: ScheduledItem[] = []
+  for (const from of removed) {
+    const index = fresh.findIndex((i) => i.activityId === from.activityId)
+    if (index >= 0) moved.push({ from, to: fresh.splice(index, 1)[0] })
+    else dropped.push(from)
+  }
+  return { kept: items.filter((i) => keptIds.has(i.id) && i.date >= today).length, moved, dropped, added: fresh }
+}

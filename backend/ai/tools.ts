@@ -1,10 +1,15 @@
 // Explicit, schema-validated tools. The AI layer can only reach application state through these.
 // Read tools return facts; write tools only *propose* changes (the user applies them in the UI).
 import { z } from 'zod'
+import { TRANSPORT_LABEL, TRANSPORT_TIPS } from '../../shared/transport'
+import { sleepMinutes } from '../../shared/routine'
+import { WEEKDAYS_LONG, weekdayOf } from '../../shared/time'
 import {
   activitySchema,
+  calendarEventDraftSchema,
   goalSchema,
   type Activity,
+  type CalendarEvent,
   type Goal,
   type PlanningInput,
   type PlanningResult,
@@ -17,8 +22,10 @@ export const TOOL_NAMES = [
   'get_activities',
   'get_goals',
   'get_availability',
+  'get_routine',
   'create_activity',
   'create_goal',
+  'create_event',
   'generate_plan',
   'explain_plan',
 ] as const
@@ -26,6 +33,7 @@ export type ToolName = (typeof TOOL_NAMES)[number]
 
 const activityDraft = activitySchema.omit({ id: true }).extend({ dryRun: z.boolean().optional() })
 const goalDraft = goalSchema.omit({ id: true })
+const eventDraft = calendarEventDraftSchema
 const noArgs = z.object({}).strict()
 
 const slug = (s: string) =>
@@ -39,6 +47,11 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
     description: 'Minutos livres por dia (AAAA-MM-DD) nesta semana, depois de compromissos fixos e sono.',
     args: null,
   },
+  get_routine: {
+    description:
+      'Rotina do utilizador: horas de sono, transporte (modo, minutos por dia e ideias para o aproveitar) e compromissos fixos semanais.',
+    args: null,
+  },
   create_activity: {
     description:
       'Propõe criar ou atualizar uma atividade (o utilizador tem de a aceitar). Com dryRun=true apenas simula, ' +
@@ -46,6 +59,12 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
     args: activityDraft,
   },
   create_goal: { description: 'Propõe criar ou atualizar um objetivo com prazo (o utilizador tem de o aceitar).', args: goalDraft },
+  create_event: {
+    description:
+      'Propõe um evento no calendário (reunião, exame, imprevisto; weekly=true só para horários fixos que se repetem). ' +
+      'O utilizador tem de o aceitar. Depois de o propor, usa generate_plan para ver como o plano se ajusta.',
+    args: eventDraft,
+  },
   generate_plan: {
     description: 'Executa o motor de planeamento para a semana atual, incluindo as atividades/objetivos propostos nesta conversa.',
     args: null,
@@ -64,6 +83,7 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
   // Proposed (and dry-run) changes are layered over the real state so plans can preview them.
   const draftActivities: Activity[] = []
   const draftGoals: Goal[] = []
+  const draftEvents: CalendarEvent[] = []
   const proposals: ProposedAction[] = []
   let plan: PlanningResult | undefined
 
@@ -71,6 +91,9 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
     ...state,
     activities: [...state.activities.filter((a) => !draftActivities.some((d) => d.id === a.id)), ...draftActivities],
     goals: [...state.goals.filter((g) => !draftGoals.some((d) => d.id === g.id)), ...draftGoals],
+    events: [...state.events.filter((e) => !draftEvents.some((d) => d.id === e.id)), ...draftEvents],
+    // with a plan on screen, replan around what changed instead of starting from scratch
+    ...(currentItems.length > 0 ? { previousItems: currentItems } : {}),
   })
 
   return {
@@ -79,7 +102,7 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
       return plan
     },
     get hasDrafts() {
-      return draftActivities.length + draftGoals.length > 0
+      return draftActivities.length + draftGoals.length + draftEvents.length > 0
     },
     call(name, args = {}) {
       switch (name) {
@@ -93,6 +116,19 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
           noArgs.parse(args)
           const { availableMinutesByDay } = generatePlan({ ...state, activities: [] })
           return availableMinutesByDay
+        }
+        case 'get_routine': {
+          noArgs.parse(args)
+          const { dayStart, dayEnd, commute } = state.preferences
+          return {
+            sleep: { wakeTime: dayStart, bedTime: dayEnd, sleepHours: Math.round((sleepMinutes(state.preferences) / 60) * 10) / 10 },
+            commute: commute && commute.minutesPerDay > 0
+              ? { mode: TRANSPORT_LABEL[commute.mode], minutesPerDay: commute.minutesPerDay, ideasToUseTheTime: TRANSPORT_TIPS[commute.mode] }
+              : null,
+            fixedCommitments: state.events
+              .filter((e) => e.weekly)
+              .map((e) => ({ title: e.title, weekday: WEEKDAYS_LONG[weekdayOf(e.date)], start: e.start, end: e.end })),
+          }
         }
         case 'create_activity': {
           const { dryRun, ...draft } = activityDraft.parse(args)
@@ -119,6 +155,17 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
             payload: goal,
           })
           return goal
+        }
+        case 'create_event': {
+          const draft = eventDraft.parse(args)
+          const event: CalendarEvent = { ...draft, id: `ev-${slug(draft.title)}-${draft.date}` }
+          draftEvents.push(event)
+          proposals.push({
+            type: 'create_event',
+            summary: `Adicionar "${event.title}" em ${event.date}, ${event.start}–${event.end}${event.weekly ? ' (todas as semanas)' : ''}`,
+            payload: event,
+          })
+          return event
         }
         case 'generate_plan': {
           noArgs.parse(args)

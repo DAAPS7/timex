@@ -1,41 +1,74 @@
 import { useState } from 'react'
+import { addDays, weekdayOf, WEEKDAYS_SHORT } from '../../../shared/time'
 import type { CalendarEvent } from '../../../shared/domain'
-import { Button, Field, Modal } from '../../components/ui'
+import { Button, Field, Modal, Segmented } from '../../components/ui'
 import { newId } from '../../utils/ids'
 
 interface Props {
   event?: CalendarEvent
   defaultDate: string
-  onSave: (e: CalendarEvent) => void
+  /** Start with the weekly (fixed schedule) option selected, e.g. from the setup wizard. */
+  defaultWeekly?: boolean
+  onSave: (events: CalendarEvent[]) => void
   onDelete?: () => void
   onClose: () => void
 }
 
-export function EventForm({ event, defaultDate, onSave, onDelete, onClose }: Props) {
+const KINDS = [
+  { value: 'once', label: 'Pontual' },
+  { value: 'weekly', label: 'Todas as semanas' },
+] as const
+
+/** First date on or after `from` that falls on the given weekday (0 = Monday). */
+const firstOnOrAfter = (from: string, weekday: number): string => addDays(from, (weekday - weekdayOf(from) + 7) % 7)
+
+export function EventForm({ event, defaultDate, defaultWeekly, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState(event?.title ?? '')
   const [date, setDate] = useState(event?.date ?? defaultDate)
   const [start, setStart] = useState(event?.start ?? '10:00')
   const [end, setEnd] = useState(event?.end ?? '11:00')
-  const [weekly, setWeekly] = useState(event?.weekly ?? false)
-  const valid = title.trim().length > 0 && end > start
+  const [kind, setKind] = useState<'once' | 'weekly'>(event ? (event.weekly ? 'weekly' : 'once') : defaultWeekly ? 'weekly' : 'once')
+  const [days, setDays] = useState<number[]>([weekdayOf(event?.date ?? defaultDate)])
+  const weekly = kind === 'weekly'
+  const multiDay = weekly && !event // a new weekly commitment can be created for several weekdays at once
+  const valid = title.trim().length > 0 && end > start && (!multiDay || days.length > 0)
+
+  const save = () => {
+    const base = { title: title.trim(), start, end, weekly }
+    if (!multiDay) return onSave([{ ...base, id: event?.id ?? newId('ev'), date }])
+    onSave(days.sort().map((d) => ({ ...base, id: newId('ev'), date: firstOnOrAfter(date, d) })))
+  }
 
   return (
-    <Modal title={event ? 'Evento fixo' : 'Novo evento fixo'} onClose={onClose}>
-      <Field label="Título"><input className="input" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder="Aula, turno, consulta…" /></Field>
-      <Field label="Data"><input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+    <Modal title={event ? 'Editar evento' : 'Novo evento'} onClose={onClose}>
+      <Field label="Tipo">
+        <Segmented options={[...KINDS]} value={kind} onChange={setKind} />
+      </Field>
+      <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>
+        {weekly ? 'Horário fixo que se repete (trabalho, universidade…). O plano nunca lhe mexe.' : 'Reunião, exame ou imprevisto. Se já tens plano, ele ajusta-se.'}
+      </p>
+      <Field label="Título"><input className="input" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder={weekly ? 'Universidade, trabalho…' : 'Reunião, exame, consulta…'} /></Field>
+      <Field label={multiDay ? 'A partir de' : 'Data'}><input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      {multiDay && (
+        <Field label="Dias da semana">
+          <div className="day-chips">
+            {WEEKDAYS_SHORT.map((d, i) => (
+              <button key={d} type="button" className={days.includes(i) ? 'on' : ''}
+                onClick={() => setDays(days.includes(i) ? days.filter((x) => x !== i) : [...days, i])}>{d}</button>
+            ))}
+          </div>
+        </Field>
+      )}
       <div className="two-col">
         <Field label="Início"><input className="input" type="time" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
         <Field label="Fim"><input className="input" type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
       </div>
-      <label className="row" style={{ marginBottom: 14 }}>
-        <input type="checkbox" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} /> Repete todas as semanas
-      </label>
       {end <= start && <p className="small" style={{ color: 'var(--red)' }}>O fim tem de ser depois do início.</p>}
       <div className="modal-actions">
         {onDelete && <Button variant="danger" onClick={onDelete}>Apagar</Button>}
         <span className="spacer" />
         <Button variant="plain" onClick={onClose}>Cancelar</Button>
-        <Button disabled={!valid} onClick={() => onSave({ id: event?.id ?? newId('ev'), title: title.trim(), date, start, end, weekly })}>Guardar</Button>
+        <Button disabled={!valid} onClick={save}>Guardar</Button>
       </div>
     </Modal>
   )

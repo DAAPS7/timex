@@ -1,6 +1,6 @@
 import { CONFLICT_TEXT } from '../../../shared/reasons'
-import { formatDuration } from '../../../shared/time'
-import type { Activity, Plan } from '../../../shared/domain'
+import { formatDuration, weekdayOf, WEEKDAYS_SHORT } from '../../../shared/time'
+import type { Activity, Plan, ScheduledItem } from '../../../shared/domain'
 import { Button, Card, CardHead } from '../../components/ui'
 
 const STATUS: Record<Plan['status'], { label: string; tone: string }> = {
@@ -22,6 +22,8 @@ interface Props {
   onRegenerate: () => void
 }
 
+const when = (i: ScheduledItem) => `${WEEKDAYS_SHORT[weekdayOf(i.date)]} ${i.start}`
+
 /** Explains the current plan: feasibility, trade-offs and what the user can do about them. */
 export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate }: Props) {
   const { result } = plan
@@ -40,6 +42,16 @@ export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate }: Pr
       </div>
       <div className="bar"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
 
+      {result.changes && (result.changes.moved.length > 0 || result.changes.dropped.length > 0 || result.changes.added.length > 0) && (
+        <div className="notice" style={{ marginTop: 12 }}>
+          <b>O plano ajustou-se a uma alteração.</b> Mantive {result.changes.kept} {result.changes.kept === 1 ? 'sessão' : 'sessões'} onde estavam.
+          <ul className="tip-list small">
+            {result.changes.moved.map(({ from, to }) => <li key={from.id}>{names.get(from.activityId) ?? from.activityId}: {when(from)} → {when(to)}</li>)}
+            {result.changes.dropped.map((i) => <li key={i.id}>{names.get(i.activityId) ?? i.activityId} ({when(i)}) já não cabe nesta semana.</li>)}
+            {result.changes.added.map((i) => <li key={i.id}>{names.get(i.activityId) ?? i.activityId}: nova sessão {when(i)}</li>)}
+          </ul>
+        </div>
+      )}
       {result.conflicts.map((c) => (
         <div key={c.activityId} className="notice" style={{ marginTop: 12 }}>
           <b>{CONFLICT_TEXT[c.code]}: {names.get(c.activityId) ?? c.activityId}.</b>{' '}

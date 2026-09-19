@@ -56,3 +56,36 @@ describe('gemini provider', () => {
     expect(r.proposals).toHaveLength(1)
   })
 })
+
+describe('routine tools', () => {
+  it('proposes a one-off event and replans around it, keeping the rest of the current plan', async () => {
+    const withGym: PlanningInput = {
+      ...state,
+      activities: [{ id: 'a-gym', name: 'Gym', sessionsPerWeek: 2, sessionMinutes: 60, priority: 'medium', preferredDays: [] }],
+    }
+    const currentItems = [
+      { id: 'a-gym:2026-09-15:08:00', activityId: 'a-gym', date: '2026-09-15', start: '08:00', end: '09:00', reasons: [] as never[] },
+      { id: 'a-gym:2026-09-17:08:00', activityId: 'a-gym', date: '2026-09-17', start: '08:00', end: '09:00', reasons: [] as never[] },
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply([{ functionCall: { name: 'create_event', args: { title: 'Reunião', date: '2026-09-15', start: '08:00', end: '10:00' } } }]))
+      .mockResolvedValueOnce(reply([{ functionCall: { name: 'generate_plan', args: {} } }]))
+      .mockResolvedValueOnce(reply([{ text: 'Movi o ginásio de terça.' }]))
+    const r = await handleAssistantMessage({ message: 'reunião terça às 8', state: withGym, currentItems }, {}, createGeminiProvider('key', 'm', fetchMock))
+
+    expect(r.proposals).toMatchObject([{ type: 'create_event', payload: { title: 'Reunião', weekly: false } }])
+    expect(r.plan?.changes?.kept).toBe(1)
+    expect(r.plan?.changes?.moved).toHaveLength(1)
+    const third = JSON.parse(fetchMock.mock.calls[2][1].body)
+    expect(third.contents.at(-1).parts[0].functionResponse.response.result.changes.moved).toHaveLength(1)
+  })
+
+  it('gives transport ideas from get_routine and says so when no transport is defined', async () => {
+    const prefs = { ...state.preferences, commute: { mode: 'train' as const, minutesPerDay: 80 } }
+    const withCommute = await handleAssistantMessage({ message: 'como aproveito o transporte?', state: { ...state, preferences: prefs } })
+    expect(withCommute.reply).toContain('1h20')
+    expect(withCommute.reply).toContain('•')
+    expect((await handleAssistantMessage({ message: 'como aproveito o transporte?', state })).reply).toContain('Ainda não definiste')
+  })
+})

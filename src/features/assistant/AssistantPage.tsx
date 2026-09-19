@@ -9,6 +9,8 @@ const SUGGESTIONS = [
   'Consigo encaixar 3 horas de programação?',
   'Tenho um exame de Estruturas de Dados em 3 semanas',
   'Porque pões o ginásio nesses dias?',
+  'Como aproveito o tempo de transporte?',
+  'Tenho uma reunião na quinta às 15h, até às 16h',
 ]
 
 export function AssistantPage() {
