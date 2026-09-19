@@ -8,7 +8,7 @@ import { assistantSystemPrompt } from '../prompts/assistant'
 import { TOOL_NAMES, TOOL_SPECS, type ToolName } from '../tools'
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
 const MAX_TURNS = 6 // model <-> tool round trips before giving up
 
 interface Part {

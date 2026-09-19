@@ -17,7 +17,9 @@ export function AssistantPage() {
   const [text, setText] = useState('')
   const end = useRef<HTMLDivElement>(null)
 
-  useEffect(() => end.current?.scrollIntoView({ behavior: 'smooth' }), [state.chat.length])
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [state.chat.length])
 
   const submit = (message: string) => {
     setText('')
