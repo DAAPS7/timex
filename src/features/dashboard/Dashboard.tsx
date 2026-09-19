@@ -75,7 +75,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
       <div className="grid three" style={{ margin: '16px 0' }}>
         <Card><div className="stat"><span className="muted small">Livre hoje</span><b style={{ color: 'var(--green)' }}>{freeToday === null ? '—' : formatDuration(Math.max(0, freeToday - plannedToday))}</b><span className="small muted">depois de compromissos, sono e plano</span></div></Card>
-        <Card><div className="stat"><span className="muted small">Planeado hoje</span><b style={{ color: 'var(--blue)' }}>{formatDuration(plannedToday)}</b><span className="small muted">{todayItems.length} sessões</span></div></Card>
+        <Card><div className="stat"><span className="muted small">Planeado hoje</span><b style={{ color: 'var(--accent)' }}>{formatDuration(plannedToday)}</b><span className="small muted">{todayItems.length} sessões</span></div></Card>
         <Card><div className="stat"><span className="muted small">Semana</span><b style={{ color: 'var(--orange)' }}>{plan ? `${plan.result.requestedMinutes ? Math.round((plan.result.scheduledMinutes / plan.result.requestedMinutes) * 100) : 100}%` : '—'}</b><span className="small muted">{plan ? 'do pedido encaixado' : 'ainda sem plano'}</span></div></Card>
       </div>
 

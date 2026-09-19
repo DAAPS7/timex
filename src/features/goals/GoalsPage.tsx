@@ -51,7 +51,7 @@ export function GoalsPage() {
             <button key={g.id} className="card" style={{ border: 0, textAlign: 'left', cursor: 'pointer', margin: 0 }} onClick={() => setEditing(g)}>
               <div className="row">
                 <h2>{g.title}</h2><span className="spacer" />
-                <span className={`chip ${g.priority === 'high' || g.priority === 'critical' ? 'red' : 'blue'}`}>{PRIORITY_LABEL[g.priority]}</span>
+                <span className={`chip ${g.priority === 'high' || g.priority === 'critical' ? 'red' : 'accent'}`}>{PRIORITY_LABEL[g.priority]}</span>
               </div>
               <p className={days < 0 ? '' : 'muted'} style={{ margin: '6px 0 10px', color: days < 0 ? 'var(--red)' : undefined }}>
                 {days < 0 ? 'Prazo ultrapassado' : days === 0 ? 'Prazo hoje' : `Faltam ${days} dias`} · {g.deadline}

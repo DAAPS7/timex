@@ -37,7 +37,7 @@ export function ActivitiesPage() {
                     {goal && ` · ${goal.title}`}
                   </div>
                 </button>
-                <span className={`chip ${a.priority === 'high' || a.priority === 'critical' ? 'red' : a.priority === 'medium' ? 'blue' : ''}`}>{PRIORITY_LABEL[a.priority]}</span>
+                <span className={`chip ${a.priority === 'high' || a.priority === 'critical' ? 'red' : a.priority === 'medium' ? 'accent' : ''}`}>{PRIORITY_LABEL[a.priority]}</span>
               </div>
             )
           })}

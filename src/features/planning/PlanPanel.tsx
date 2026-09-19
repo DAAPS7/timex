@@ -6,7 +6,7 @@ import { Button, Card, CardHead } from '../../components/ui'
 const STATUS: Record<Plan['status'], { label: string; tone: string }> = {
   proposed: { label: 'Proposto', tone: 'orange' },
   accepted: { label: 'Aceite', tone: 'green' },
-  modified: { label: 'Modificado', tone: 'blue' },
+  modified: { label: 'Modificado', tone: 'accent' },
 }
 const FEASIBILITY = {
   fully_feasible: { label: 'Tudo cabe', tone: 'green' },

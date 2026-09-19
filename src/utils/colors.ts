@@ -1,6 +1,6 @@
-const PALETTE = ['var(--blue)', 'var(--green)', 'var(--orange)', 'var(--pink)', 'var(--purple)', 'var(--teal)', 'var(--indigo)']
+const PALETTE = ['var(--accent)', 'var(--accent-2)', 'var(--orange)', 'var(--crimson)', 'var(--rose)', 'var(--amber)']
 
-/** Stable vivid color per activity id. */
+/** Stable red/orange-family color per activity id. */
 export function colorFor(id: string): string {
   let h = 0
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0

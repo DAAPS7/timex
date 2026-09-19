@@ -64,7 +64,7 @@ export function CalendarPage() {
 
       <div className="legend" style={{ margin: '14px 4px 18px' }}>
         <span><i style={{ background: 'var(--text-2)' }} />Compromisso fixo</span>
-        <span><i style={{ background: 'var(--blue)' }} />Atividade planeada</span>
+        <span><i style={{ background: 'var(--accent)' }} />Atividade planeada</span>
         <span><i style={{ border: '1.5px solid var(--sep)' }} />Tempo livre</span>
       </div>
 
