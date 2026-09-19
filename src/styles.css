@@ -189,3 +189,61 @@ button, input, select { font: inherit; color: inherit; }
 .auth-card { width: 100%; max-width: 380px; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
 .sync-banner { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-radius: var(--r-ctl); padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
+
+/* ---- Glows: warm ember light on interactive and highlighted surfaces ---- */
+:root { --glow: 255, 90, 44; }
+body {
+  background:
+    radial-gradient(900px 480px at 85% -8%, rgba(var(--glow), 0.16), transparent 60%),
+    radial-gradient(700px 460px at -5% 105%, rgba(224, 36, 36, 0.12), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.sidebar { box-shadow: 1px 0 32px rgba(var(--glow), 0.07); }
+.brand-mark { box-shadow: 0 0 18px rgba(var(--glow), 0.55); }
+.nav-item { transition: background 0.15s, box-shadow 0.15s; }
+.nav-item:hover:not(.active) { box-shadow: inset 0 0 0 1px var(--outline), 0 0 16px rgba(var(--glow), 0.14); }
+.nav-item.active { box-shadow: 0 0 22px rgba(var(--glow), 0.5); }
+
+/* Cards: a warm hairline along the top edge, and a glowing outline on hover */
+.card, .modal, .week { position: relative; transition: border-color 0.2s, box-shadow 0.2s; }
+.card::before, .week::before {
+  content: ''; position: absolute; top: -1px; left: 12%; right: 12%; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 138, 80, 0.7), transparent);
+}
+.card:hover, .week:hover { border-color: rgba(var(--glow), 0.4); box-shadow: var(--shadow), 0 0 28px rgba(var(--glow), 0.14); }
+.hero { box-shadow: var(--shadow), 0 0 64px rgba(var(--glow), 0.38); }
+.hero:hover { box-shadow: var(--shadow), 0 0 84px rgba(var(--glow), 0.5); }
+.auth-card { box-shadow: var(--shadow), 0 0 80px rgba(var(--glow), 0.2); }
+.modal { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7), 0 0 60px rgba(var(--glow), 0.16); }
+
+/* Buttons and inputs */
+.btn.primary { box-shadow: 0 0 18px rgba(var(--glow), 0.4); }
+.btn.primary:hover:not(:disabled) { box-shadow: 0 0 30px rgba(var(--glow), 0.7); }
+.btn.tinted:hover:not(:disabled), .btn.plain:hover:not(:disabled) { box-shadow: 0 0 18px rgba(var(--glow), 0.25); }
+.input:focus { box-shadow: 0 0 0 3px rgba(var(--glow), 0.22), 0 0 22px rgba(var(--glow), 0.35); }
+.suggestions button:hover, .day-tabs button:hover { border-color: rgba(var(--glow), 0.5); box-shadow: 0 0 14px rgba(var(--glow), 0.25); }
+
+/* Data */
+.stat b { text-shadow: 0 0 22px color-mix(in srgb, currentColor 55%, transparent); }
+.bar > i { box-shadow: 0 0 12px rgba(var(--glow), 0.7); }
+.chip.accent, .chip.orange, .chip.red { box-shadow: 0 0 12px color-mix(in srgb, currentColor 30%, transparent); }
+.week-head.today b { box-shadow: 0 0 16px rgba(var(--glow), 0.8); }
+.block.planned { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 16px rgba(var(--glow), 0.4); }
+.block.planned:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 24px rgba(var(--glow), 0.7); }
+.bubble.user { box-shadow: 0 0 20px rgba(var(--glow), 0.3); }
+.proposal { box-shadow: 0 0 22px rgba(var(--glow), 0.14); }
+.dot { filter: drop-shadow(0 0 4px rgba(var(--glow), 0.9)); }
+
+/* ---- Single-axis, no-zoom page (works like a native app on mobile) ---- */
+html, body { max-width: 100%; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; }
+.day-tabs { touch-action: pan-x; } /* the only element that scrolls sideways */
+.main, .card, .grid > *, .list-item .grow { min-width: 0; }
+.card, .bubble, .list-item { overflow-wrap: anywhere; }
+img, svg { max-width: 100%; }
+@media (max-width: 820px) {
+  /* 16px inputs stop iOS from zooming in when a field is focused */
+  input, select, textarea { font-size: 16px; }
+  .two-col { grid-template-columns: 1fr; }
+  .bubble, .proposal { max-width: 92%; }
+}
