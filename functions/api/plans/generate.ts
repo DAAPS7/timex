@@ -1,7 +1,3 @@
-import { handle, json, parseBody } from '../../../backend/api/http'
-import { planningInputSchema } from '../../../shared/domain'
-import { generatePlan } from '../../../backend/domains/planning/engine'
+import { generatePlanRoute } from '../../../backend/api/routes'
 
-// Stateless in the prototype: the client sends its current data, the engine returns a proposed plan.
-export const onRequestPost: PagesFunction = ({ request }) =>
-  handle(async () => json(generatePlan(await parseBody(request, planningInputSchema))))
+export const onRequestPost: PagesFunction = ({ request }) => generatePlanRoute(request)

@@ -3,20 +3,21 @@
 ## Correr e publicar
 ```
 npm install
-npm run dev          # só frontend (a API precisa do passo abaixo)
-npm run pages:dev    # build + Cloudflare Pages local com /api  → http://localhost:8788
+npm run dev          # só frontend (proxy /api → :8787)
+npm run cf:dev       # build + Worker local com /api  → http://localhost:8787
 npm test             # 15 testes (motor + assistente)
 npm run typecheck
-npm run deploy       # wrangler pages deploy dist   (pede login: npx wrangler login)
+npm run deploy       # build + wrangler deploy   (pede login: npx wrangler login)
 ```
-Deploy via Git no dashboard Cloudflare: build command `npm run build`, output `dist`. Sem variáveis de ambiente.
+Deploy via Git (Workers Builds): build command `npm run build`, deploy command `npx wrangler deploy`. Sem variáveis de ambiente.
+`wrangler.toml` usa um Worker (`worker/index.ts`) + assets de `dist/`; `functions/` mantém-se para quem preferir Pages (as rotas partilham `backend/api/routes`).
 
 ## O que existe
 | Parte | Onde | Estado |
 |---|---|---|
 | Motor de planeamento determinístico | `backend/domains/planning` | Disponibilidade derivada, restrições hard/soft, slots, scoring configurável, pausas, limite diário, prazos, feasibility + conflitos + razões |
 | Assistente | `backend/ai` | Interface `AIProvider`, tools com schema (zod), interpretador **offline por regras** PT/EN. Propõe; só aplica com confirmação |
-| API (Pages Functions) | `functions/api` | `/health`, `/plans/generate`, `/assistant/message` — validação zod |
+| API (Worker) | `worker/`, `backend/api/routes` | `/health`, `/plans/generate`, `/assistant/message` — validação zod |
 | UI | `src/features` | Hoje, Calendário semanal, Atividades, Objetivos, Assistente, Definições. Claro/escuro, mobile com tab bar |
 | Docs | `docs/api.md`, `docs/decisions/001-002` | ADRs das decisões abaixo |
 

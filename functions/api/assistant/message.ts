@@ -1,6 +1,3 @@
-import { handle, json, parseBody } from '../../../backend/api/http'
-import { assistantRequestSchema } from '../../../shared/domain'
-import { handleAssistantMessage } from '../../../backend/ai/assistantService'
+import { assistantMessageRoute } from '../../../backend/api/routes'
 
-export const onRequestPost: PagesFunction = ({ request }) =>
-  handle(async () => json(await handleAssistantMessage(await parseBody(request, assistantRequestSchema))))
+export const onRequestPost: PagesFunction = ({ request }) => assistantMessageRoute(request)

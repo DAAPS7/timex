@@ -1,3 +1,3 @@
-import { json } from '../../backend/api/http'
+import { health } from '../../backend/api/routes'
 
-export const onRequestGet: PagesFunction = async () => json({ ok: true })
+export const onRequestGet: PagesFunction = () => health()

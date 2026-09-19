@@ -2,8 +2,8 @@
 
 **Status:** temporary, deviates from the target architecture (PostgreSQL behind the API).
 
-**Decision.** Frontend = static Vite build; backend = Cloudflare Pages Functions (`functions/api`) reusing the
-`backend/` modules. There is no database yet: user data is kept in the browser (`localStorage`, behind
+**Decision.** Frontend = static Vite build; backend = a Cloudflare Worker (`worker/index.ts`, serving `dist/` as assets) reusing the
+`backend/` modules; `functions/api` mounts the same routes for Pages. There is no database yet: user data is kept in the browser (`localStorage`, behind
 `src/services/api/storage.ts`) and sent to stateless endpoints when the engine or assistant is needed.
 
 **Why.** It allows deploying and testing the planning experience on Pages with zero infrastructure or secrets.
