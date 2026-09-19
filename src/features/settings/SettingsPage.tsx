@@ -1,10 +1,12 @@
 import type { Preferences } from '../../../shared/domain'
 import { Button, Card, CardHead, Field } from '../../components/ui'
 import { emptyState, seedState } from '../../state/seed'
+import { useSession } from '../../state/session'
 import { useStore } from '../../state/store'
 
 export function SettingsPage() {
   const { state, dispatch } = useStore()
+  const { user, logout } = useSession()
   const p = state.preferences
   const set = (patch: Partial<Preferences>) => dispatch({ type: 'setPreferences', preferences: { ...p, ...patch } })
   const wakingOk = p.dayEnd > p.dayStart
@@ -27,8 +29,12 @@ export function SettingsPage() {
         <p className="small muted">Fora do horário acordado é considerado sono e nunca é planeado. Depois de alterar, gera o plano de novo.</p>
       </Card>
       <Card>
-        <CardHead title="Dados do protótipo" />
-        <p className="small muted" style={{ marginBottom: 12 }}>Os dados ficam apenas neste browser (não há conta nem base de dados ainda).</p>
+        <CardHead title="Conta" />
+        <p className="small muted" style={{ marginBottom: 12 }}>Sessão iniciada como {user.email}. Os teus dados ficam guardados na tua conta.</p>
+        <Button variant="plain" onClick={logout}>Terminar sessão</Button>
+      </Card>
+      <Card>
+        <CardHead title="Dados" />
         <div className="row">
           <Button variant="tinted" onClick={() => dispatch({ type: 'replace', state: seedState() })}>Repor dados de exemplo</Button>
           <Button variant="danger" onClick={() => dispatch({ type: 'replace', state: emptyState() })}>Começar do zero</Button>

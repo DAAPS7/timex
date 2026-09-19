@@ -6,3 +6,14 @@ compatibility_date = "2026-09-01"
 directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Accounts and user data. Create the real database with `npx wrangler d1 create timex` and paste its id below.
+# The placeholder id only works for local development (`npm run db:migrate:local`).
+[[d1_databases]]
+binding = "DB"
+database_name = "timex"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

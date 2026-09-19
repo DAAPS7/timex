@@ -148,3 +148,28 @@ export const assistantRequestSchema = z.object({
 
 })
 export type AssistantRequest = z.infer<typeof assistantRequestSchema>
+
+// ---- Accounts and stored user data ----
+
+export const credentialsSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(8, 'A palavra-passe deve ter pelo menos 8 caracteres').max(128),
+})
+export type Credentials = z.infer<typeof credentialsSchema>
+
+export interface User {
+  id: string
+  email: string
+}
+
+// What the server stores per user. Plans and chat are opaque here (they are outputs the client already
+// received from the engine/assistant); the editable inputs are validated strictly.
+export const userDataSchema = z.object({
+  events: z.array(calendarEventSchema).max(500),
+  activities: z.array(activitySchema).max(100),
+  goals: z.array(goalSchema).max(100),
+  preferences: preferencesSchema,
+  plans: z.record(z.string(), z.unknown()),
+  chat: z.array(z.unknown()).max(60),
+})
+export type UserData = z.infer<typeof userDataSchema>

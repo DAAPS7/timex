@@ -31,6 +31,28 @@ const noArgs = z.object({}).strict()
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+/** Tool descriptions and argument schemas, for provider adapters that expose the tools to an LLM. */
+export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType | null }> = {
+  get_activities: { description: 'Lista as atividades que o utilizador já tem.', args: null },
+  get_goals: { description: 'Lista os objetivos (com prazo) que o utilizador já tem.', args: null },
+  get_availability: {
+    description: 'Minutos livres por dia (AAAA-MM-DD) nesta semana, depois de compromissos fixos e sono.',
+    args: null,
+  },
+  create_activity: {
+    description:
+      'Propõe criar ou atualizar uma atividade (o utilizador tem de a aceitar). Com dryRun=true apenas simula, ' +
+      'sem propor nada (para perguntas do tipo "consigo encaixar…?"). Só usa valores que o utilizador disse.',
+    args: activityDraft,
+  },
+  create_goal: { description: 'Propõe criar ou atualizar um objetivo com prazo (o utilizador tem de o aceitar).', args: goalDraft },
+  generate_plan: {
+    description: 'Executa o motor de planeamento para a semana atual, incluindo as atividades/objetivos propostos nesta conversa.',
+    args: null,
+  },
+  explain_plan: { description: 'Devolve as sessões do plano que o utilizador está a ver, com os motivos de cada uma.', args: null },
+}
+
 export interface ToolRunner {
   call(name: ToolName, args?: unknown): unknown
   readonly proposals: ProposedAction[]

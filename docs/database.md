@@ -632,3 +632,8 @@ The planning engine may eventually evolve toward:
 - automatic rescheduling
 
 These should be introduced only after the deterministic prototype is validated.
+
+## Implemented (ADR 003)
+
+Cloudflare D1, migrations in `migrations/`. `users(id, email, password_hash, created_at)`, `sessions(id = SHA-256 of token, user_id, expires_at)`
+and `user_data(user_id, data JSON, updated_at)`. `user_data` is an interim single-document store; the normalised tables above are still the target.

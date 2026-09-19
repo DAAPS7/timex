@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef, useState, type Dispatch, type ReactNode } from 'react'
 import type { Activity, CalendarEvent, Goal, Plan, PlanningResult, Preferences, ProposedAction } from '../../shared/domain'
-import { loadState, saveState } from '../services/api/storage'
-import { seedState } from './seed'
+import { stateApi } from '../services/api/client'
 
 export interface ChatMessage {
   id: string
@@ -73,12 +72,28 @@ function reducer(s: AppState, a: Action): AppState {
   }
 }
 
-const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action> } | null>(null)
+const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; syncError: boolean } | null>(null)
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, () => loadState() ?? seedState())
-  useEffect(() => saveState(state), [state])
-  return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>
+const SAVE_DELAY_MS = 600
+
+/** Holds the user's data. `initial` comes from the server; every change is saved back (debounced). */
+export function StoreProvider({ initial, children }: { initial: AppState; children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initial)
+  const [syncError, setSyncError] = useState(false)
+  const first = useRef(true)
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false // just loaded from the server: nothing to save yet
+      return
+    }
+    const timer = setTimeout(() => {
+      stateApi.save(state).then(() => setSyncError(false), () => setSyncError(true))
+    }, SAVE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [state])
+
+  return <Ctx.Provider value={{ state, dispatch, syncError }}>{children}</Ctx.Provider>
 }
 
 export function useStore() {

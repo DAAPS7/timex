@@ -1,27 +1,17 @@
-// PROTOTYPE persistence: user data lives in this browser only (see docs/decisions/002-prototype-persistence.md).
-// It stands in for the future /api/activities, /api/goals, ... resources backed by PostgreSQL.
-import type { AppState } from '../../state/store'
-
+// Legacy prototype storage (ADR 002): before accounts existed, data lived in this browser. It is only read
+// once, to import that data into a new account; user data is otherwise stored on the server (ADR 003).
 const KEY = 'timex.v1'
 
-export function loadState(): AppState | null {
+export function loadLegacyState(): unknown {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as AppState) : null
+    return raw ? JSON.parse(raw) : null
   } catch {
     return null
   }
 }
 
-export function saveState(state: AppState): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state))
-  } catch {
-    // storage unavailable (private mode / quota): the app keeps working for this session
-  }
-}
-
-export function clearState(): void {
+export function clearLegacyState(): void {
   try {
     localStorage.removeItem(KEY)
   } catch {

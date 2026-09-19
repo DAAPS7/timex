@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useStore } from '../../state/store'
 import { Icon, type IconName } from '../ui'
 
 export type Page = 'dashboard' | 'calendar' | 'activities' | 'goals' | 'assistant' | 'settings'
@@ -13,6 +14,7 @@ const NAV: { page: Page; label: string; icon: IconName }[] = [
 ]
 
 export function AppShell({ page, onNavigate, children }: { page: Page; onNavigate: (p: Page) => void; children: ReactNode }) {
+  const { syncError } = useStore()
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Navegação">
@@ -23,7 +25,10 @@ export function AppShell({ page, onNavigate, children }: { page: Page; onNavigat
           </button>
         ))}
       </nav>
-      <main className="main">{children}</main>
+      <main className="main">
+        {syncError && <div className="sync-banner" role="alert">Não foi possível guardar as últimas alterações. Vou tentar de novo na próxima alteração.</div>}
+        {children}
+      </main>
     </div>
   )
 }

@@ -1,0 +1,2 @@
+# Copy to .dev.vars (git-ignored) for `npm run cf:dev`. Without a key the rule-based assistant is used.
+GEMINI_API_KEY=

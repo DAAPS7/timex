@@ -1,6 +1,6 @@
 # 002 — Prototype persistence and Cloudflare Pages hosting
 
-**Status:** temporary, deviates from the target architecture (PostgreSQL behind the API).
+**Status:** superseded by ADR 003 for persistence and accounts (still describes the Worker/assets hosting).
 
 **Decision.** Frontend = static Vite build; backend = a Cloudflare Worker (`worker/index.ts`, serving `dist/` as assets) reusing the
 `backend/` modules; `functions/api` mounts the same routes for Pages. There is no database yet: user data is kept in the browser (`localStorage`, behind

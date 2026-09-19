@@ -202,3 +202,9 @@ button, input, select { font: inherit; color: inherit; }
 .hero .btn.plain { background: rgba(255, 255, 255, 0.22); color: #fff; }
 .notice { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--orange) 14%, transparent); }
 .notice + .notice { margin-top: 8px; }
+
+/* Accounts */
+.center-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.auth-card { width: 100%; max-width: 380px; }
+.link { background: none; border: 0; padding: 0; color: var(--blue); font: inherit; cursor: pointer; }
+.sync-banner { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); border-radius: var(--r-ctl); padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }

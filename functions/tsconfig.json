@@ -9,6 +9,6 @@
     "noEmit": true,
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["./**/*.ts", "../worker", "../shared", "../backend/api", "../backend/core", "../backend/ai", "../backend/domains/planning/*.ts"],
+  "include": ["./**/*.ts", "../worker", "../shared", "../backend/api", "../backend/core", "../backend/ai", "../backend/domains", "../backend/domains/planning/*.ts"],
   "exclude": ["../backend/**/*.test.ts"]
 }
