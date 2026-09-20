@@ -58,14 +58,18 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
   create_activity: {
     description:
       'Propõe criar ou atualizar uma atividade (o utilizador tem de a aceitar). splitMinutes (opcional) divide cada sessão em blocos desse ' +
-      'tamanho, espaçados ao longo do mesmo dia (só se o utilizador pedir para dividir/distribuir). Com dryRun=true apenas simula, ' +
+      'tamanho, espaçados ao longo do mesmo dia (só se o utilizador pedir para dividir/distribuir). canOverlap=true se a atividade se pode fazer ' +
+      'em simultâneo com viagens ou outros tempos ocupados (ler, ouvir podcasts, rever cartões, investigação durante aulas); ' +
+      'overlapWith: títulos dos eventos onde o pode fazer (ex. ["Aulas"]); maxOverlapMinutes: máximo por semana nesses tempos; onlyPreferred=true para só usar as horas ' +
+      'preferidas (preferredStart/preferredEnd). Com dryRun=true apenas simula, ' +
       'sem propor nada (para perguntas do tipo "consigo encaixar…?"). Só usa valores que o utilizador disse.',
     args: activityDraft,
   },
   create_goal: { description: 'Propõe criar ou atualizar um objetivo com prazo (o utilizador tem de o aceitar).', args: goalDraft },
   create_event: {
     description:
-      'Propõe um evento no calendário (reunião, exame, imprevisto; weekly=true só para horários fixos que se repetem; remote=true se for online/remoto, sem deslocação). ' +
+      'Propõe um evento no calendário (reunião, exame, imprevisto; weekly=true só para horários fixos que se repetem; remote=true se for online/remoto, sem deslocação; kind="travel" para viagem/tempo difícil de aproveitar que o utilizador quer marcar; ' +
+      'canOverlap=true se durante ele dá para fazer outras coisas, por exemplo no comboio). ' +
       'O utilizador tem de o aceitar. Depois de o propor, usa generate_plan para ver como o plano se ajusta.',
     args: eventDraft,
   },

@@ -16,6 +16,10 @@ const calendarEventBase = z.object({
   end: time,
   weekly: z.boolean().default(false), // repeats every week on the same weekday
   remote: z.boolean().optional(), // online / from home: no travel is reserved for it
+  // 'travel' is time the user places by hand where it is hard to do other things (commute, waiting…); it replaces the
+  // automatic commute on that day.
+  kind: z.enum(['commitment', 'travel']).optional(),
+  canOverlap: z.boolean().optional(), // other things can be done during it (reading on a train): activities that allow it may overlap
     location: z.string().max(120).optional(),
 })
 const endAfterStart = { message: 'end must be after start', path: ['end'] }
@@ -35,6 +39,10 @@ export const activitySchema = z.object({
   preferredEnd: time.optional(),
   // The session may be split into blocks of this many minutes, placed at different times of the same day.
   splitMinutes: z.number().int().min(15).max(240).optional(),
+  canOverlap: z.boolean().optional(), // can be done at the same time as something else (e.g. during a train ride)
+  overlapWith: z.array(z.string().min(1).max(60)).max(10).optional(), // only during these events/travel (by title); empty = any
+  maxOverlapMinutes: z.number().int().min(15).max(2400).optional(), // at most this much per week done on overlapped time
+  onlyPreferred: z.boolean().optional(), // hard: only inside the preferred hours instead of merely preferring them
   deadline: date.optional(),
   goalId: z.string().max(64).optional(),
 })
@@ -102,6 +110,7 @@ export const reasonCodeSchema = z.enum([
   'LIGHT_DAY',
   'SHORTENED',
   'SPLIT_OVER_DAY',
+  'DURING_TRAVEL',
 ])
 export type ReasonCode = z.infer<typeof reasonCodeSchema>
 
@@ -155,6 +164,7 @@ export interface CommuteBlock {
   start: string
   end: string
   modes: TransportMode[]
+  overlappable?: boolean // reading or listening is possible (bus, train), so compatible activities may overlap it
 }
 
 export interface EssentialBlock {

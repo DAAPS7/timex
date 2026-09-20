@@ -8,6 +8,7 @@ export const SCORING = {
   sameDayPenalty: 35, // per existing session of the same activity on that day
   dayGap: 25, // split activities: reward for spacing blocks apart within the day (up to dayGapMinutes)
   dayGapMinutes: 240,
+  overlapBonus: 18, // compatible activity placed on time that is busy anyway (e.g. travel)
   contextSwitchPenalty: 12, // adjacent to a different activity
   workloadPenalty: 20, // scaled by planned/max daily load after placing
   inconveniencePenalty: 25, // scaled by the fraction of the slot outside comfortable hours

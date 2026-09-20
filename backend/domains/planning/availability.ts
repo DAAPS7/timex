@@ -57,7 +57,8 @@ export function detectOverlappingEvents(events: CalendarEvent[], dates: string[]
       .filter((e) => occursOn(e, date))
       .sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id))
     for (let i = 1; i < day.length; i++) {
-      if (day[i].start < day[i - 1].end) {
+      // overlapping on purpose (an event marked as allowing other things) is not a mistake
+      if (day[i].start < day[i - 1].end && !day[i].canOverlap && !day[i - 1].canOverlap) {
         warnings.push({ code: 'OVERLAPPING_EVENTS', detail: `${day[i - 1].title} / ${day[i].title} (${date})` })
       }
     }
@@ -76,7 +77,9 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
   const blocks: CommuteBlock[] = []
   for (const date of dates) {
     if (date < input.today) continue
-    const fixed = input.events.filter((e) => e.weekly && !e.remote && occursOn(e, date))
+    // travel placed by the user on this day replaces the automatic estimate
+    if (input.events.some((e) => e.kind === 'travel' && occursOn(e, date))) continue
+    const fixed = input.events.filter((e) => e.weekly && !e.remote && e.kind !== 'travel' && occursOn(e, date))
     if (fixed.length === 0) continue
     const first = Math.min(...fixed.map((e) => toMinutes(e.start)))
     const last = Math.max(...fixed.map((e) => toMinutes(e.end)))
@@ -85,10 +88,55 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
     const go = { start: Math.max(wake, first - before), end: first }
     const back = { start: last, end: Math.min(bed, last + after) }
     for (const b of [go, back]) {
-      if (b.end > b.start) blocks.push({ date, start: toHHMM(b.start), end: toHHMM(b.end), modes: commute.modes })
+      if (b.end > b.start) blocks.push({ date, start: toHHMM(b.start), end: toHHMM(b.end), modes: commute.modes, overlappable: commute.modes.every((m) => m === 'bus' || m === 'train') })
     }
   }
   return blocks
+}
+
+/**
+ * Time that is busy but where other things can still be done: travel by bus/train and events marked "allows other
+ * things". Only activities that can be done at the same time may be placed here.
+ */
+export interface OverlapSlot extends Interval {
+  date: string
+  source: string // normalized title of the event it comes from, or TRAVEL_SOURCE for automatic transport
+}
+
+export const TRAVEL_SOURCE = 'transporte'
+
+/** Lowercase, no accents: "Aulas de Investigação" matches "aulas de investigacao". */
+export const normalizeTitle = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
+
+/** Whether an activity's `overlapWith` list allows the slot (an empty list allows any). */
+export const overlapAllowed = (overlapWith: string[] | undefined, slot: OverlapSlot): boolean =>
+  !overlapWith || overlapWith.length === 0 ||
+  overlapWith.some((w) => {
+    const t = normalizeTitle(w)
+    return slot.source.includes(t) || t.includes(slot.source)
+  })
+
+export function computeOverlapSlots(input: PlanningInput, dates: string[], commute: CommuteBlock[]): OverlapSlot[] {
+  const slots: OverlapSlot[] = []
+  for (const date of dates) {
+    if (date < input.today) continue
+    const gone = date === input.today && input.nowMinutes !== undefined ? [{ start: 0, end: input.nowMinutes }] : []
+    const raw: OverlapSlot[] = [
+      ...input.events
+        .filter((e) => e.canOverlap && occursOn(e, date))
+        .map((e) => ({ date, source: normalizeTitle(e.title), start: toMinutes(e.start), end: toMinutes(e.end) })),
+      ...commute
+        .filter((b) => b.date === date && b.overlappable)
+        .map((b) => ({ date, source: TRAVEL_SOURCE, start: toMinutes(b.start), end: toMinutes(b.end) })),
+    ]
+    for (const s of raw) for (const iv of subtractIntervals([s], gone)) slots.push({ ...s, ...iv })
+  }
+  return slots
+}
+
+/** The slots as free intervals per day (merged). */
+export function slotsToIntervals(slots: OverlapSlot[], dates: string[]): DayIntervals {
+  return Object.fromEntries(dates.map((d) => [d, mergeIntervals(slots.filter((s) => s.date === d).map(({ start, end }) => ({ start, end })))]))
 }
 
 /**

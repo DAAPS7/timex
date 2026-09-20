@@ -496,3 +496,13 @@ Scaling architecture should only be introduced when actual requirements justify 
 - Availability = waking window − fixed/one-off events − commute blocks (`computeCommute`). See ADR 004.
 - `previousItems` makes the run *stable*: valid sessions are kept, only disturbed ones move, and `changes` explains the difference.
 - Result additions: `commuteBlocks`, `changes` (both optional).
+
+## Layers on top of free time, overlap, split blocks and preferred hours
+
+- **Free time** is waking hours minus fixed events. Travel and daily essentials (meals…) are layered on top of it.
+- **Travel**: automatic (before the first / after the last in-person weekly commitment; remote ones need none) unless the
+  user places `kind: 'travel'` events by hand, which replace the estimate on that day.
+- **Overlap**: busy time that allows other things (bus/train travel, events with `canOverlap`) can host activities marked
+  `canOverlap`. Two activities never share the same overlap time. These sessions carry the `DURING_TRAVEL` reason.
+- **Split activities** (`splitMinutes`): a session becomes several short blocks placed on the same day, spaced apart.
+- **Preferred hours** (`preferredStart`/`preferredEnd`) are soft; with `onlyPreferred` they are a hard constraint.

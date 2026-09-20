@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { splitWeeklyMinutes } from '../../../shared/sessions'
 import { WEEKDAYS_SHORT, formatDuration } from '../../../shared/time'
-import type { Activity, Goal, Priority } from '../../../shared/domain'
+import type { Activity, CalendarEvent, Goal, Priority } from '../../../shared/domain'
 import { Button, Field, Modal, Segmented } from '../../components/ui'
 import { newId } from '../../utils/ids'
 
@@ -11,12 +11,13 @@ const PRIORITIES = (Object.keys(PRIORITY_LABEL) as Priority[]).map((value) => ({
 interface Props {
   activity?: Activity
   goals: Goal[]
+  events: CalendarEvent[] // where an overlappable activity may be done: the user's events that allow other things
   onSave: (a: Activity) => void
   onDelete?: () => void
   onClose: () => void
 }
 
-export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Props) {
+export function ActivityForm({ activity, goals, events, onSave, onDelete, onClose }: Props) {
   const [name, setName] = useState(activity?.name ?? '')
   const [weeklyHours, setWeeklyHours] = useState(activity ? (activity.sessionsPerWeek * activity.sessionMinutes) / 60 : 3)
   const [preferredSession, setPreferredSession] = useState(activity?.sessionMinutes ?? 60)
@@ -24,6 +25,10 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
   const [days, setDays] = useState<number[]>(activity?.preferredDays ?? [])
   const [prefStart, setPrefStart] = useState(activity?.preferredStart ?? '')
   const [prefEnd, setPrefEnd] = useState(activity?.preferredEnd ?? '')
+  const [canOverlap, setCanOverlap] = useState(activity?.canOverlap ?? false)
+  const [overlapWith, setOverlapWith] = useState<string[]>(activity?.overlapWith ?? [])
+  const [maxOverlapHours, setMaxOverlapHours] = useState(activity?.maxOverlapMinutes ? activity.maxOverlapMinutes / 60 : 0) // 0 = no cap
+  const [onlyPreferred, setOnlyPreferred] = useState(activity?.onlyPreferred ?? false)
   const [split, setSplit] = useState(activity?.splitMinutes ?? 0) // 0 = one block
   const [deadline, setDeadline] = useState(activity?.deadline ?? '')
   const [goalId, setGoalId] = useState(activity?.goalId ?? '')
@@ -31,6 +36,8 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
   const windowOk = (prefStart === '') === (prefEnd === '') && (prefStart === '' || prefEnd > prefStart)
   // The user says how many hours per week; sessions are derived from the preferred session length.
   const { sessionsPerWeek: sessions, sessionMinutes: minutes } = splitWeeklyMinutes(weeklyHours * 60, preferredSession)
+  // Titles of the user's events that allow other things, plus automatic bus/train travel.
+  const overlapSources = [...new Set([...events.filter((e) => e.canOverlap).map((e) => e.title), 'Transporte'])]
   const splitOn = split > 0
   const splitOk = !splitOn || (split >= 15 && split < minutes)
   const valid = name.trim() !== '' && weeklyHours >= 0.25 && preferredSession >= 15 && windowOk && splitOk
@@ -46,6 +53,10 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
       preferredStart: prefStart || undefined,
       preferredEnd: prefEnd || undefined,
       splitMinutes: splitOn ? split : undefined,
+      canOverlap: canOverlap || undefined,
+      overlapWith: canOverlap && overlapWith.length > 0 ? overlapWith : undefined,
+      maxOverlapMinutes: canOverlap && maxOverlapHours > 0 ? Math.round(maxOverlapHours * 60) : undefined,
+      onlyPreferred: onlyPreferred && prefStart !== '' ? true : undefined,
       deadline: deadline || undefined,
       goalId: goalId || undefined,
     })
@@ -78,10 +89,37 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
           ))}
         </div>
       </Field>
+      <h3 style={{ margin: '4px 0 8px' }}>Horas preferidas</h3>
       <div className="two-col">
-        <Field label="Preferir a partir das"><input className="input" type="time" value={prefStart} onChange={(e) => setPrefStart(e.target.value)} /></Field>
-        <Field label="…até às"><input className="input" type="time" value={prefEnd} onChange={(e) => setPrefEnd(e.target.value)} /></Field>
+        <Field label="A partir das"><input className="input" type="time" value={prefStart} onChange={(e) => setPrefStart(e.target.value)} /></Field>
+        <Field label="Até às"><input className="input" type="time" value={prefEnd} onChange={(e) => setPrefEnd(e.target.value)} /></Field>
       </div>
+      {prefStart !== '' && (
+        <label className="row" style={{ marginBottom: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={onlyPreferred} onChange={(e) => setOnlyPreferred(e.target.checked)} />
+          <span>Só dentro deste horário (senão é apenas uma preferência)</span>
+        </label>
+      )}
+      <label className="row" style={{ marginBottom: 12, cursor: 'pointer' }}>
+        <input type="checkbox" checked={canOverlap} onChange={(e) => setCanOverlap(e.target.checked)} />
+        <span>Pode fazer-se durante viagens ou outros tempos em que dá para fazer outras coisas (ler, podcasts…)</span>
+      </label>
+      {canOverlap && (
+        <>
+          <Field label="Onde (nenhum marcado = qualquer tempo que o permita)">
+            <div className="day-chips">
+              {overlapSources.map((s) => (
+                <button key={s} type="button" aria-pressed={overlapWith.includes(s)} className={overlapWith.includes(s) ? 'on' : ''}
+                  onClick={() => setOverlapWith(overlapWith.includes(s) ? overlapWith.filter((x) => x !== s) : [...overlapWith, s])}>{s}</button>
+              ))}
+            </div>
+          </Field>
+          {overlapSources.length === 0 && <p className="small muted" style={{ marginTop: -6, marginBottom: 12 }}>Ainda não tens eventos que permitam fazer outras coisas. Marca-os no calendário ("Dá para fazer outras coisas ao mesmo tempo").</p>}
+          <Field label="No máximo por semana nestes tempos (horas, 0 = sem limite)">
+            <input className="input" type="number" min={0} max={40} step={0.5} value={maxOverlapHours} onChange={(e) => setMaxOverlapHours(Number(e.target.value))} />
+          </Field>
+        </>
+      )}
       {!windowOk && <p className="small" style={{ color: 'var(--red)', marginTop: -6, marginBottom: 12 }}>Indica início e fim do horário preferido (fim depois do início).</p>}
       <div className="two-col">
         <Field label="Prazo (opcional)"><input className="input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>

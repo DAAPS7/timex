@@ -14,9 +14,13 @@ import {
   computeAvailability,
   computeCommute,
   computeEssentials,
+  computeOverlapSlots,
+  overlapAllowed,
+  slotsToIntervals,
   detectOverlappingEvents,
   subtractIntervals,
   sumMinutes,
+  type Interval,
   type DayIntervals,
 } from './availability'
 import { scoreCandidate, type Candidate, type PlacedSlot } from './scoring'
@@ -95,6 +99,8 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   const commuteBlocks = computeCommute(input, dates)
   const essentialBlocks = computeEssentials(input, dates, commuteBlocks)
   const free = computeAvailability(input, commuteBlocks, essentialBlocks)
+  const overlapSlots = computeOverlapSlots(input, dates, commuteBlocks)
+  const overlapFree = slotsToIntervals(overlapSlots, dates) // shrinks as sessions are placed on it
   const originalFree = structuredClone(free)
   const availableMinutesByDay = Object.fromEntries(dates.map((d) => [d, sumMinutes(free[d])]))
   // Free time left after planning: what was available minus the sessions that sit inside it (past sessions do not count).
@@ -115,8 +121,11 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   let requested = 0
 
   function commitSlot(activityId: string, c: Candidate, item: Pick<ScheduledItem, 'reasons'> & { id?: string }) {
-    const pad = { start: c.start - breakMinutes, end: c.end + breakMinutes }
-    free[c.date] = subtractIntervals(free[c.date], [pad])
+    if (c.overlap) {
+      overlapFree[c.date] = subtractIntervals(overlapFree[c.date], [c]) // two things cannot share the same overlap time
+    } else {
+      free[c.date] = subtractIntervals(free[c.date], [{ start: c.start - breakMinutes, end: c.end + breakMinutes }])
+    }
     load[c.date] += c.end - c.start
     placed.push({ activityId, ...c })
     items.push({
@@ -130,6 +139,13 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   }
 
   // Stable replanning: keep the sessions of the previous plan that are still valid (past ones always), move the rest.
+  /** Overlap time still open to this activity: only the sources it allows. */
+  function overlapFor(activity: Activity): DayIntervals {
+    if (!activity.overlapWith || activity.overlapWith.length === 0) return overlapFree
+    const blocked = slotsToIntervals(overlapSlots.filter((s) => !overlapAllowed(activity.overlapWith, s)), dates)
+    return Object.fromEntries(dates.map((d) => [d, subtractIntervals(overlapFree[d], blocked[d])]))
+  }
+
   const keptIds = new Set<string>()
   const removed: ScheduledItem[] = []
   const kept = new Map<string, { sessions: number; minutes: number }>()
@@ -142,8 +158,11 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     const c: Candidate = { date: prev.date, start: toMinutes(prev.start), end: toMinutes(prev.end) }
     const totals = kept.get(prev.activityId) ?? { sessions: 0, minutes: 0 }
     const validLength = !!activity && c.end - c.start <= activity.sessionMinutes && c.end - c.start >= minSession(activity)
-    const fits = dates.includes(prev.date) && (free[prev.date] ?? []).some((iv) => iv.start <= c.start && iv.end >= c.end)
-    if (activity && validLength && totals.sessions < activity.sessionsPerWeek && (past || fits)) {
+    const inside = (list: Interval[] | undefined) => (list ?? []).some((iv) => iv.start <= c.start && iv.end >= c.end)
+    const inFree = dates.includes(prev.date) && inside(free[prev.date])
+    const inOverlap = dates.includes(prev.date) && !!activity?.canOverlap && !inFree && inside(overlapFor(activity)[prev.date])
+    if (inOverlap) c.overlap = true
+    if (activity && validLength && totals.sessions < activity.sessionsPerWeek && (past || inFree || inOverlap)) {
       commitSlot(prev.activityId, c, prev)
       keptIds.add(prev.id)
       kept.set(prev.activityId, { sessions: totals.sessions + 1, minutes: totals.minutes + c.end - c.start })
@@ -176,11 +195,26 @@ export function generatePlan(input: PlanningInput): PlanningResult {
       })
     }
 
+    // Slots for a block of `duration`: free time, plus overlap time for activities that can share it, inside the preferred
+    // hours when the user made them mandatory.
+    function gather(ds: string[], duration: number): Candidate[] {
+      let out = candidatesFor(free, ds, duration, load, maxDaily)
+      const overlapUsed = placed.filter((p) => p.activityId === activity.id && p.overlap).reduce((n, p) => n + (p.end - p.start), 0)
+      const overlapRoom = activity.maxOverlapMinutes === undefined || overlapUsed + duration <= activity.maxOverlapMinutes
+      if (activity.canOverlap && overlapRoom) out = out.concat(candidatesFor(overlapFor(activity), ds, duration, load, maxDaily).map((c) => ({ ...c, overlap: true })))
+      if (activity.onlyPreferred && activity.preferredStart && activity.preferredEnd) {
+        const from = toMinutes(activity.preferredStart)
+        const to = toMinutes(activity.preferredEnd)
+        out = out.filter((c) => c.start >= from && c.end <= to)
+      }
+      return out
+    }
+
     // Try the full session length first, shrinking down to the hard minimum.
     function placeSession(sameDate?: string): boolean {
       for (let duration = activity.sessionMinutes; duration >= minSession(activity); duration -= STEP) {
-        const onDay = sameDate ? candidatesFor(free, [sameDate], duration, load, maxDaily) : []
-        const candidates = onDay.length > 0 ? onDay : candidatesFor(free, window, duration, load, maxDaily)
+        const onDay = sameDate ? gather([sameDate], duration) : []
+        const candidates = onDay.length > 0 ? onDay : gather(window, duration)
         if (candidates.length === 0) continue
         let best: { c: Candidate; score: number; reasons: ReasonCode[] } | undefined
         for (const c of candidates) {

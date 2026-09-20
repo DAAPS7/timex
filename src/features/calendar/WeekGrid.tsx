@@ -66,7 +66,7 @@ export function WeekGrid({ dates, today, dayStart, dayEnd, events, activities, p
             </div>
             <div className={`day-col ${date < today ? 'past' : ''}`}>
               {events.filter((e) => occursOn(e, date)).map((e) => (
-                <button key={e.id} className="block fixed" onClick={() => onEvent(e)}
+                <button key={e.id} className={`block ${e.kind === 'travel' ? 'commute travel' : 'fixed'}`} onClick={() => onEvent(e)}
                   style={{ top: top(Math.max(toMinutes(e.start), startMin), startMin), height: height(Math.max(toMinutes(e.start), startMin), toMinutes(e.end)) }}>
                   <b>{e.title}</b>{e.start}–{e.end}
                 </button>
@@ -84,7 +84,7 @@ export function WeekGrid({ dates, today, dayStart, dayEnd, events, activities, p
                 </div>
               ))}
               {items.map((i) => (
-                <button key={i.id} className="block planned" onClick={() => onItem(i)}
+                <button key={i.id} className={`block planned ${i.reasons.includes('DURING_TRAVEL') ? 'overlap' : ''}`} onClick={() => onItem(i)}
                   style={{ top: top(toMinutes(i.start), startMin), height: height(toMinutes(i.start), toMinutes(i.end)), background: colorFor(i.activityId) }}>
                   <b>{names.get(i.activityId) ?? 'Atividade'}</b>{i.start}–{i.end}
                 </button>

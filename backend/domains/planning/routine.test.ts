@@ -27,8 +27,8 @@ describe('commute', () => {
   it('reserves half before the first and half after the last fixed commitment, only on days that have one', () => {
     const blocks = generatePlan(withCommute()).commuteBlocks!.filter((b) => b.date === WEEK)
     expect(blocks).toEqual([
-      { date: WEEK, start: '08:30', end: '09:00', modes: ['bus'] },
-      { date: WEEK, start: '17:00', end: '17:30', modes: ['bus'] },
+      { date: WEEK, start: '08:30', end: '09:00', modes: ['bus'], overlappable: true },
+      { date: WEEK, start: '17:00', end: '17:30', modes: ['bus'], overlappable: true },
     ])
     // the event is weekly on Mondays only: Tuesday has none
     expect(generatePlan(withCommute()).commuteBlocks!.filter((b) => b.date === '2026-09-15')).toEqual([])
@@ -209,3 +209,103 @@ describe('activities split over the day', () => {
 })
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
+
+describe('travel placed by the user', () => {
+  const commute = { modes: ['bus' as const], minutesPerDay: 60 }
+  const prefs = { ...input().preferences, commute }
+
+  it('replaces the automatic estimate on that day only', () => {
+    const plan = generatePlan(
+      input({
+        events: [
+          event({ id: 'uni', weekly: true, start: '09:00', end: '17:00' }),
+          event({ id: 'trip', kind: 'travel', start: '07:30', end: '08:45', date: WEEK }),
+        ],
+        preferences: prefs,
+      }),
+    )
+    expect(plan.commuteBlocks!.filter((b) => b.date === WEEK)).toEqual([])
+    // the other days the university repeats on are not affected (weekly = Mondays only here, so check the estimate elsewhere)
+    const other = generatePlan(input({ events: [event({ id: 'uni', weekly: true, start: '09:00', end: '17:00' })], preferences: prefs }))
+    expect(other.commuteBlocks!.filter((b) => b.date === WEEK)).toHaveLength(2)
+  })
+
+  it('is not treated as an in-person commitment that needs its own travel', () => {
+    const plan = generatePlan(input({ events: [event({ id: 'trip', weekly: true, kind: 'travel' })], preferences: prefs }))
+    expect(plan.commuteBlocks).toEqual([])
+  })
+})
+
+describe('overlapping where other things can be done', () => {
+  const trip = event({ id: 'trip', kind: 'travel', canOverlap: true, start: '08:00', end: '09:00' })
+  const reading = activity({ id: 'read', sessionMinutes: 45, canOverlap: true, preferredStart: '08:00', preferredEnd: '09:00' })
+
+  it('lets a compatible activity sit on top of the travel', () => {
+    const plan = generatePlan(input({ events: [trip], activities: [reading] }))
+    expect(plan.scheduledItems[0]).toMatchObject({ date: WEEK, start: '08:00' })
+    expect(plan.scheduledItems[0].reasons).toContain('DURING_TRAVEL')
+  })
+
+  it('does not let an activity that is not compatible use it', () => {
+    const plan = generatePlan(input({ events: [trip], activities: [{ ...reading, canOverlap: false }] }))
+    const i = plan.scheduledItems[0]
+    expect(i.date === WEEK && i.start < '09:00').toBe(false)
+  })
+
+  it('does not put two things on the same overlap time, and no overlap warning for it', () => {
+    const other = activity({ id: 'pod', sessionMinutes: 45, canOverlap: true, preferredStart: '08:00', preferredEnd: '09:00' })
+    const plan = generatePlan(input({ events: [trip, event({ id: 'lect', canOverlap: true, start: '08:30', end: '09:30' })], activities: [reading, other] }))
+    const onWeek = plan.scheduledItems.filter((i) => i.date === WEEK && i.reasons.includes('DURING_TRAVEL'))
+    for (const a of onWeek) for (const b of onWeek) if (a !== b) expect(a.end <= b.start || b.end <= a.start).toBe(true)
+    expect(plan.warnings).toEqual([])
+  })
+
+  it('keeps an overlapped session when replanning', () => {
+    const first = generatePlan(input({ events: [trip], activities: [reading] }))
+    const again = generatePlan(input({ events: [trip], activities: [reading], previousItems: first.scheduledItems }))
+    expect(again.scheduledItems).toEqual(first.scheduledItems)
+  })
+})
+
+describe('only in the preferred hours', () => {
+  it('never places outside them when made mandatory, and reports the conflict when they are full', () => {
+    const gym = activity({ id: 'gym', sessionsPerWeek: 7, sessionMinutes: 60, preferredStart: '18:00', preferredEnd: '19:00', onlyPreferred: true })
+    const plan = generatePlan(input({ activities: [gym] }))
+    expect(plan.scheduledItems.every((i) => i.start >= '18:00' && i.end <= '19:00')).toBe(true)
+    const busy = generatePlan(input({ activities: [gym], events: [event({ id: 'x', start: '17:30', end: '19:30' })] }))
+    expect(busy.scheduledItems.filter((i) => i.date === WEEK)).toEqual([])
+  })
+
+  it('only prefers them by default', () => {
+    const gym = activity({ id: 'gym', sessionsPerWeek: 1, preferredStart: '18:00', preferredEnd: '19:00' })
+    const plan = generatePlan(input({ activities: [gym], events: [event({ id: 'x', weekly: true, start: '17:00', end: '20:00' })] }))
+    expect(plan.scheduledItems).toHaveLength(1)
+  })
+})
+
+describe('research during university classes', () => {
+  const classes = event({ id: 'uni', title: 'Aulas de Universidade', weekly: true, canOverlap: true, start: '09:00', end: '13:00' })
+  const meeting = event({ id: 'meet', title: 'Reunião', canOverlap: true, start: '14:00', end: '15:00' })
+  const research = (o: Partial<Activity> = {}) =>
+    activity({ id: 'inv', name: 'Investigação', sessionsPerWeek: 4, sessionMinutes: 60, canOverlap: true, overlapWith: ['aulas'], ...o })
+  const overlapped = (plan: ReturnType<typeof generatePlan>) => plan.scheduledItems.filter((i) => i.reasons.includes('DURING_TRAVEL'))
+
+  it('does some of it inside class, and only inside class', () => {
+    const plan = generatePlan(input({ events: [classes, meeting], activities: [research()] }))
+    expect(overlapped(plan).length).toBeGreaterThan(0)
+    for (const i of overlapped(plan)) expect(i.date === WEEK && i.start >= '09:00' && i.end <= '13:00').toBe(true)
+  })
+
+  it('stops at the weekly cap for time done inside class', () => {
+    const plan = generatePlan(input({ events: [classes], activities: [research({ sessionsPerWeek: 4, maxOverlapMinutes: 60 })] }))
+    expect(overlapped(plan)).toHaveLength(1)
+    expect(plan.scheduledItems).toHaveLength(4) // the rest goes to free time
+    expect(plan.status).toBe('fully_feasible')
+  })
+
+  it('matches titles without caring about case or accents', () => {
+    const plan = generatePlan(input({ events: [meeting], activities: [research({ overlapWith: ['reuniao'] })] }))
+    expect(overlapped(plan).every((i) => i.start >= '14:00' && i.end <= '15:00')).toBe(true)
+    expect(overlapped(plan).length).toBeGreaterThan(0)
+  })
+})

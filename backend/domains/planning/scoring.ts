@@ -6,6 +6,7 @@ export interface Candidate {
   date: string
   start: number
   end: number
+  overlap?: boolean // sits on busy time that allows other things (travel, "allows other things" events)
 }
 
 export interface PlacedSlot extends Candidate {
@@ -38,6 +39,11 @@ export function scoreCandidate(c: Candidate, ctx: ScoreContext): Scored {
   const reasons: ReasonCode[] = []
   let score = SCORING.priority[ctx.priority]
   if (ctx.priority === 'high' || ctx.priority === 'critical') reasons.push('HIGH_PRIORITY')
+
+  if (c.overlap) {
+    score += SCORING.overlapBonus
+    reasons.push('DURING_TRAVEL')
+  }
 
   // preferred time window
   if (activity.preferredStart && activity.preferredEnd) {

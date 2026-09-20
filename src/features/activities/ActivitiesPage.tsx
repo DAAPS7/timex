@@ -32,7 +32,8 @@ export function ActivitiesPage() {
                   <h3>{a.name}</h3>
                   <div className="small muted">
                     {a.sessionsPerWeek}× {formatDuration(a.sessionMinutes)} por semana
-                    {a.preferredStart && ` · ${a.preferredStart}–${a.preferredEnd}`}
+                    {a.preferredStart && ` · ${a.onlyPreferred ? 'só ' : ''}${a.preferredStart}–${a.preferredEnd}`}
+                    {a.canOverlap && ` · em simultâneo${a.overlapWith?.length ? ' (' + a.overlapWith.join(', ') + ')' : ''}`}
                     {a.preferredDays.length > 0 && ` · ${a.preferredDays.map((d) => WEEKDAYS_SHORT[d]).join(', ')}`}
                     {goal && ` · ${goal.title}`}
                   </div>
@@ -46,7 +47,7 @@ export function ActivitiesPage() {
 
       {editing && (
         <ActivityForm
-          activity={editing === 'new' ? undefined : editing} goals={state.goals} onClose={() => setEditing(null)}
+          activity={editing === 'new' ? undefined : editing} goals={state.goals} events={state.events} onClose={() => setEditing(null)}
           onSave={(activity) => { dispatch({ type: 'upsertActivity', activity }); setEditing(null) }}
           onDelete={editing === 'new' ? undefined : () => { dispatch({ type: 'deleteActivity', id: editing.id }); setEditing(null) }}
         />

@@ -125,7 +125,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
       )}
       {activityForm && (
         <ActivityForm
-          activity={activityForm === 'new' ? undefined : activityForm} goals={state.goals}
+          activity={activityForm === 'new' ? undefined : activityForm} goals={state.goals} events={state.events}
           onClose={() => setActivityForm(null)}
           onSave={(activity) => { dispatch({ type: 'upsertActivity', activity }); setActivityForm(null) }}
           onDelete={activityForm === 'new' ? undefined : () => { dispatch({ type: 'deleteActivity', id: activityForm.id }); setActivityForm(null) }}
