@@ -167,3 +167,45 @@ describe('essentials on top of free time', () => {
     expect(generatePlan(input()).essentialBlocks).toEqual([])
   })
 })
+
+describe('remote commitments', () => {
+  it('reserve no travel, while in-person ones on the same day still do', () => {
+    const commute = { modes: ['bus' as const], minutesPerDay: 60 }
+    const prefs = { ...input().preferences, commute }
+    const remote = generatePlan(input({ events: [event({ id: 'online', weekly: true, remote: true })], preferences: prefs }))
+    expect(remote.commuteBlocks).toEqual([])
+    const mixed = generatePlan(
+      input({ events: [event({ id: 'online', weekly: true, remote: true }), event({ id: 'lab', weekly: true, start: '14:00', end: '17:00' })], preferences: prefs }),
+    )
+    // travel wraps only the in-person commitment (14:00-17:00), not the remote one in the morning
+    expect(mixed.commuteBlocks!.filter((b) => b.date === WEEK).map((b) => [b.start, b.end])).toEqual([['13:30', '14:00'], ['17:00', '17:30']])
+  })
+})
+
+describe('activities split over the day', () => {
+  const study = activity({ id: 'study', sessionsPerWeek: 1, sessionMinutes: 120, splitMinutes: 30 })
+
+  it('delivers one session as short blocks on the same day, with gaps between them', () => {
+    const plan = generatePlan(input({ activities: [study] }))
+    const items = plan.scheduledItems
+    expect(items).toHaveLength(4)
+    expect(new Set(items.map((i) => i.date)).size).toBe(1)
+    expect(items.every((i) => i.end > i.start && toMin(i.end) - toMin(i.start) === 30)).toBe(true)
+    for (let n = 1; n < items.length; n++) expect(toMin(items[n].start) - toMin(items[n - 1].end)).toBeGreaterThanOrEqual(60)
+    expect(plan.status).toBe('fully_feasible')
+    expect(plan.scheduledMinutes).toBe(120)
+  })
+
+  it('keeps the blocks where they are when replanning with nothing changed', () => {
+    const first = generatePlan(input({ activities: [study] }))
+    const again = generatePlan(input({ activities: [study], previousItems: first.scheduledItems }))
+    expect(again.scheduledItems).toEqual(first.scheduledItems)
+  })
+
+  it('a split at least as long as the session changes nothing', () => {
+    const plan = generatePlan(input({ activities: [activity({ id: 's', sessionMinutes: 60, splitMinutes: 60 })] }))
+    expect(plan.scheduledItems).toHaveLength(1)
+  })
+})
+
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))

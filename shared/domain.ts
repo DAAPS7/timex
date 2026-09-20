@@ -15,6 +15,7 @@ const calendarEventBase = z.object({
   start: time,
   end: time,
   weekly: z.boolean().default(false), // repeats every week on the same weekday
+  remote: z.boolean().optional(), // online / from home: no travel is reserved for it
     location: z.string().max(120).optional(),
 })
 const endAfterStart = { message: 'end must be after start', path: ['end'] }
@@ -32,6 +33,8 @@ export const activitySchema = z.object({
   preferredDays: z.array(z.number().int().min(0).max(6)).max(7).default([]),
   preferredStart: time.optional(),
   preferredEnd: time.optional(),
+  // The session may be split into blocks of this many minutes, placed at different times of the same day.
+  splitMinutes: z.number().int().min(15).max(240).optional(),
   deadline: date.optional(),
   goalId: z.string().max(64).optional(),
 })
@@ -98,6 +101,7 @@ export const reasonCodeSchema = z.enum([
   'SPREAD_OUT',
   'LIGHT_DAY',
   'SHORTENED',
+  'SPLIT_OVER_DAY',
 ])
 export type ReasonCode = z.infer<typeof reasonCodeSchema>
 

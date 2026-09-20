@@ -6,6 +6,8 @@ export const SCORING = {
   deadlineUrgency: 25, // scaled by urgency (0..1) and by how early the slot is
   spread: 20, // reward for distance (up to 2 days) from other sessions of the same activity
   sameDayPenalty: 35, // per existing session of the same activity on that day
+  dayGap: 25, // split activities: reward for spacing blocks apart within the day (up to dayGapMinutes)
+  dayGapMinutes: 240,
   contextSwitchPenalty: 12, // adjacent to a different activity
   workloadPenalty: 20, // scaled by planned/max daily load after placing
   inconveniencePenalty: 25, // scaled by the fraction of the slot outside comfortable hours

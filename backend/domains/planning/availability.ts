@@ -66,7 +66,7 @@ export function detectOverlappingEvents(events: CalendarEvent[], dates: string[]
 }
 
 /**
- * Commute time: on days with recurring (fixed) commitments, half of the daily transport time is reserved right
+ * Commute time: on days with recurring (fixed) in-person commitments (remote ones need no travel), half of the daily transport time is reserved right
  * before the first one and the other half right after the last one, kept inside waking hours.
  */
 export function computeCommute(input: PlanningInput, dates: string[]): CommuteBlock[] {
@@ -76,7 +76,7 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
   const blocks: CommuteBlock[] = []
   for (const date of dates) {
     if (date < input.today) continue
-    const fixed = input.events.filter((e) => e.weekly && occursOn(e, date))
+    const fixed = input.events.filter((e) => e.weekly && !e.remote && occursOn(e, date))
     if (fixed.length === 0) continue
     const first = Math.min(...fixed.map((e) => toMinutes(e.start)))
     const last = Math.max(...fixed.map((e) => toMinutes(e.end)))

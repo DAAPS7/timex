@@ -8,6 +8,7 @@ export const REASON_TEXT: Record<ReasonCode, string> = {
   BEFORE_DEADLINE: 'Fica antes do prazo, com margem.',
   SPREAD_OUT: 'Distribui as sessões pela semana.',
   LIGHT_DAY: 'É um dia com pouca carga.',
+  SPLIT_OVER_DAY: 'Dividida em blocos, espaçados ao longo do dia.',
   SHORTENED: 'Foi encurtada porque não havia um intervalo maior.',
 }
 

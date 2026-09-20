@@ -20,6 +20,7 @@ export interface ScoreContext {
   placed: PlacedSlot[] // everything already scheduled in this run
   maxDailyMinutes: number
   breakMinutes: number
+  splitOverDay?: boolean // the activity is delivered as several blocks that belong on the same day, spaced apart
 }
 
 export interface Scored {
@@ -53,8 +54,16 @@ export function scoreCandidate(c: Candidate, ctx: ScoreContext): Scored {
 
   // distribution: spread sessions of the same activity across the week
   const sameActivity = placed.filter((p) => p.activityId === activity.id)
-  const sameDay = sameActivity.filter((p) => p.date === c.date).length
-  score -= SCORING.sameDayPenalty * sameDay
+  const sameDayBlocks = sameActivity.filter((p) => p.date === c.date)
+  const sameDay = sameDayBlocks.length
+  if (ctx.splitOverDay && sameDay > 0) {
+    // blocks of a split activity: the farther from the other blocks of that day, the better
+    const gap = Math.min(...sameDayBlocks.map((p) => Math.max(0, c.start - p.end, p.start - c.end)))
+    score += (SCORING.dayGap * Math.min(gap, SCORING.dayGapMinutes)) / SCORING.dayGapMinutes
+    if (gap >= 60) reasons.push('SPLIT_OVER_DAY')
+  } else {
+    score -= SCORING.sameDayPenalty * sameDay
+  }
   if (sameActivity.length > 0 && sameDay === 0) {
     const nearest = Math.min(...sameActivity.map((p) => Math.abs(daysBetween(p.date, c.date))))
     score += (SCORING.spread * Math.min(nearest, 2)) / 2

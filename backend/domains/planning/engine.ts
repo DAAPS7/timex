@@ -28,19 +28,35 @@ const PRIORITY_RANK: Record<Priority, number> = { low: 0, medium: 1, high: 2, cr
 const STEP = SCORING.slotStepMinutes
 
 interface Plan {
-  activity: Activity
+  activity: Activity // effective: a splittable activity is expressed as many short sessions
   priority: Priority
   deadline?: string
+  blocksPerSession: number // > 1 when the original session was split into blocks
+}
+
+/**
+ * A splittable activity (session of 120 min, blocks of 30) becomes 4 blocks per session: to the rest of the engine they
+ * are ordinary short sessions, which keeps requested/scheduled minutes, replanning and conflicts consistent.
+ */
+function effective(activity: Activity): { activity: Activity; blocksPerSession: number } {
+  const split = activity.splitMinutes
+  if (!split || split >= activity.sessionMinutes) return { activity, blocksPerSession: 1 }
+  const blocks = Math.ceil(activity.sessionMinutes / split)
+  return {
+    activity: { ...activity, sessionMinutes: split, minSessionMinutes: split, sessionsPerWeek: activity.sessionsPerWeek * blocks },
+    blocksPerSession: blocks,
+  }
 }
 
 /** Merge the activity with its goal: highest priority and earliest deadline win. */
 function normalize(input: PlanningInput): Plan[] {
-  return input.activities.map((activity) => {
+  return input.activities.map((original) => {
+    const { activity, blocksPerSession } = effective(original)
     const goal = input.goals.find((g) => g.id === activity.goalId)
     const priority =
       goal && PRIORITY_RANK[goal.priority] > PRIORITY_RANK[activity.priority] ? goal.priority : activity.priority
     const deadlines = [activity.deadline, goal?.deadline].filter((d): d is string => !!d).sort()
-    return { activity, priority, deadline: deadlines[0] }
+    return { activity, priority, deadline: deadlines[0], blocksPerSession }
   })
 }
 
@@ -117,9 +133,11 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   const keptIds = new Set<string>()
   const removed: ScheduledItem[] = []
   const kept = new Map<string, { sessions: number; minutes: number }>()
+  const plans = order(normalize(input))
+  const activityOf = (id: string) => plans.find((p) => p.activity.id === id)?.activity
   const previous = [...(input.previousItems ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
   for (const prev of previous) {
-    const activity = input.activities.find((a) => a.id === prev.activityId)
+    const activity = activityOf(prev.activityId)
     const past = prev.date < input.today
     const c: Candidate = { date: prev.date, start: toMinutes(prev.start), end: toMinutes(prev.end) }
     const totals = kept.get(prev.activityId) ?? { sessions: 0, minutes: 0 }
@@ -134,15 +152,17 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     }
   }
 
-  for (const plan of order(normalize(input))) {
-    const { activity, priority, deadline } = plan
+  for (const plan of plans) {
+    const { activity, priority, deadline, blocksPerSession } = plan
     const window = dates.filter((d) => !deadline || d <= deadline)
     const activityRequested = activity.sessionsPerWeek * activity.sessionMinutes
     requested += activityRequested
     let scheduled = kept.get(activity.id)?.minutes ?? 0
 
     let sessions = kept.get(activity.id)?.sessions ?? 0
-    while (sessions < activity.sessionsPerWeek && placeSession()) sessions++
+    // The blocks of one session go on the same day when they fit there (spaced apart); otherwise anywhere in the window.
+    const lastBlockDate = () => placed.filter((p) => p.activityId === activity.id).at(-1)?.date
+    while (sessions < activity.sessionsPerWeek && placeSession(sessions % blocksPerSession !== 0 ? lastBlockDate() : undefined)) sessions++
 
     if (scheduled < activityRequested) {
       const deadlineLimited = !!deadline && deadline < lastDate
@@ -157,14 +177,15 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     }
 
     // Try the full session length first, shrinking down to the hard minimum.
-    function placeSession(): boolean {
+    function placeSession(sameDate?: string): boolean {
       for (let duration = activity.sessionMinutes; duration >= minSession(activity); duration -= STEP) {
-        const candidates = candidatesFor(free, window, duration, load, maxDaily)
+        const onDay = sameDate ? candidatesFor(free, [sameDate], duration, load, maxDaily) : []
+        const candidates = onDay.length > 0 ? onDay : candidatesFor(free, window, duration, load, maxDaily)
         if (candidates.length === 0) continue
         let best: { c: Candidate; score: number; reasons: ReasonCode[] } | undefined
         for (const c of candidates) {
           const s = scoreCandidate(c, {
-            activity, priority, deadline, today: input.today, placed, maxDailyMinutes: maxDaily, breakMinutes,
+            activity, priority, deadline, today: input.today, placed, maxDailyMinutes: maxDaily, breakMinutes, splitOverDay: blocksPerSession > 1,
           })
           if (!best || s.score > best.score) best = { c, ...s } // ties keep the earliest candidate
         }

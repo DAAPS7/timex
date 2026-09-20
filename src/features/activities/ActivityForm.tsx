@@ -24,13 +24,16 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
   const [days, setDays] = useState<number[]>(activity?.preferredDays ?? [])
   const [prefStart, setPrefStart] = useState(activity?.preferredStart ?? '')
   const [prefEnd, setPrefEnd] = useState(activity?.preferredEnd ?? '')
+  const [split, setSplit] = useState(activity?.splitMinutes ?? 0) // 0 = one block
   const [deadline, setDeadline] = useState(activity?.deadline ?? '')
   const [goalId, setGoalId] = useState(activity?.goalId ?? '')
 
   const windowOk = (prefStart === '') === (prefEnd === '') && (prefStart === '' || prefEnd > prefStart)
   // The user says how many hours per week; sessions are derived from the preferred session length.
   const { sessionsPerWeek: sessions, sessionMinutes: minutes } = splitWeeklyMinutes(weeklyHours * 60, preferredSession)
-  const valid = name.trim() !== '' && weeklyHours >= 0.25 && preferredSession >= 15 && windowOk
+  const splitOn = split > 0
+  const splitOk = !splitOn || (split >= 15 && split < minutes)
+  const valid = name.trim() !== '' && weeklyHours >= 0.25 && preferredSession >= 15 && windowOk && splitOk
 
   const save = () =>
     onSave({
@@ -42,6 +45,7 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
       preferredDays: [...days].sort(),
       preferredStart: prefStart || undefined,
       preferredEnd: prefEnd || undefined,
+      splitMinutes: splitOn ? split : undefined,
       deadline: deadline || undefined,
       goalId: goalId || undefined,
     })
@@ -54,6 +58,17 @@ export function ActivityForm({ activity, goals, onSave, onDelete, onClose }: Pro
         <Field label="Duração de cada sessão (min)"><input className="input" type="number" min={15} max={480} step={15} value={preferredSession} onChange={(e) => setPreferredSession(Number(e.target.value))} /></Field>
       </div>
       <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>Fica em {sessions} {sessions === 1 ? 'sessão' : 'sessões'} de {formatDuration(minutes)} ({formatDuration(sessions * minutes)} por semana)</p>
+      <label className="row" style={{ marginBottom: 10, cursor: 'pointer' }}>
+        <input type="checkbox" checked={splitOn} onChange={(e) => setSplit(e.target.checked ? Math.min(30, Math.max(15, minutes - 15)) : 0)} />
+        <span>Pode ser dividida em blocos ao longo do dia</span>
+      </label>
+      {splitOn && (
+        <Field label="Duração de cada bloco (min)">
+          <input className="input" type="number" min={15} max={240} step={15} value={split} onChange={(e) => setSplit(Number(e.target.value))} />
+        </Field>
+      )}
+      {splitOn && !splitOk && <p className="small" style={{ color: 'var(--red)', marginTop: -6, marginBottom: 12 }}>O bloco tem de ter pelo menos 15 min e ser mais curto que a sessão ({formatDuration(minutes)}).</p>}
+      {splitOn && splitOk && <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>Cada sessão vira {Math.ceil(minutes / split)} blocos de {formatDuration(split)}, espaçados no mesmo dia.</p>}
       <Field label="Prioridade"><Segmented options={PRIORITIES} value={priority} onChange={setPriority} /></Field>
       <Field label="Dias preferidos (opcional)">
         <div className="segmented">

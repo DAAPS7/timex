@@ -28,13 +28,14 @@ export function EventForm({ event, defaultDate, defaultWeekly, onSave, onDelete,
   const [start, setStart] = useState(event?.start ?? '10:00')
   const [end, setEnd] = useState(event?.end ?? '11:00')
   const [kind, setKind] = useState<'once' | 'weekly'>(event ? (event.weekly ? 'weekly' : 'once') : defaultWeekly ? 'weekly' : 'once')
+  const [remote, setRemote] = useState(event?.remote ?? false)
   const [days, setDays] = useState<number[]>([weekdayOf(event?.date ?? defaultDate)])
   const weekly = kind === 'weekly'
   const multiDay = weekly && !event // a new weekly commitment can be created for several weekdays at once
   const valid = title.trim().length > 0 && end > start && (!multiDay || days.length > 0)
 
   const save = () => {
-    const base = { title: title.trim(), start, end, weekly }
+    const base = { title: title.trim(), start, end, weekly, ...(remote ? { remote: true } : {}) }
     if (!multiDay) return onSave([{ ...base, id: event?.id ?? newId('ev'), date }])
     onSave(days.sort().map((d) => ({ ...base, id: newId('ev'), date: firstOnOrAfter(date, d) })))
   }
@@ -47,6 +48,12 @@ export function EventForm({ event, defaultDate, defaultWeekly, onSave, onDelete,
       <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>
         {weekly ? 'Horário fixo que se repete (trabalho, universidade…). O plano nunca lhe mexe.' : 'Reunião, exame ou imprevisto. Se já tens plano, ele ajusta-se.'}
       </p>
+      {weekly && (
+        <>
+          <Field label="Onde"><Segmented options={[{ value: 'in', label: 'Presencial' }, { value: 'remote', label: 'Remoto / online' }]} value={remote ? 'remote' : 'in'} onChange={(v) => setRemote(v === 'remote')} /></Field>
+          <p className="small muted" style={{ marginTop: -6, marginBottom: 14 }}>{remote ? 'Sem deslocação: não reservo tempo de transporte para este horário.' : 'Reservo o tempo de transporte antes do primeiro e depois do último horário presencial do dia.'}</p>
+        </>
+      )}
       <Field label="Título"><input className="input" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder={weekly ? 'Universidade, trabalho…' : 'Reunião, exame, consulta…'} /></Field>
       <Field label={multiDay ? 'A partir de' : 'Data'}><input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       {multiDay && (

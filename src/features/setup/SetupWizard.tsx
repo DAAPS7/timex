@@ -48,7 +48,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
             {fixed.map((e) => (
               <div key={e.id} className="list-item">
                 <span className="dot" style={{ background: 'var(--text-2)' }} />
-                <button className="grow" onClick={() => setEventForm(e)}><h3>{e.title}</h3><div className="small muted">{WEEKDAYS_LONG[weekdayOf(e.date)]} · {e.start}–{e.end}</div></button>
+                <button className="grow" onClick={() => setEventForm(e)}><h3>{e.title}</h3><div className="small muted">{WEEKDAYS_LONG[weekdayOf(e.date)]} · {e.start}–{e.end}{e.remote ? ' · remoto' : ''}</div></button>
               </div>
             ))}
           </div>
