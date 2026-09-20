@@ -1,4 +1,4 @@
-import { addDays, startOfWeek, weekDates } from '../../../shared/time'
+import { addDays } from '../../../shared/time'
 
 export type CalendarView = 'day' | '3days' | 'week' | 'agenda'
 
@@ -9,9 +9,15 @@ export const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
   { value: 'agenda', label: 'Agenda' },
 ]
 
-/** Days shown for a view around `anchor`. Week and agenda always show the whole (Monday-first) week. */
-export const datesFor = (view: CalendarView, anchor: string): string[] =>
-  view === 'day' ? [anchor] : view === '3days' ? [0, 1, 2].map((n) => addDays(anchor, n)) : weekDates(startOfWeek(anchor))
+/**
+ * Days shown for a view. The window rolls with the anchor (today by default) and the anchor is always the second day,
+ * so yesterday and the days ahead are visible. It is not tied to Monday-Sunday: from a Sunday the week ahead is on screen.
+ */
+export const datesFor = (view: CalendarView, anchor: string): string[] => {
+  if (view === 'day') return [anchor]
+  const count = view === '3days' ? 3 : 7
+  return Array.from({ length: count }, (_, i) => addDays(anchor, i - 1))
+}
 
 /** How many days "previous" / "next" move the anchor. */
 export const STEP_DAYS: Record<CalendarView, number> = { day: 1, '3days': 3, week: 7, agenda: 7 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addDays, startOfWeek, todayLocal, weekDates, weekdayOf, WEEKDAYS_SHORT, WEEKDAYS_LONG } from '../../../shared/time'
+import { addDays, startOfWeek, todayLocal, weekdayOf, WEEKDAYS_SHORT, WEEKDAYS_LONG } from '../../../shared/time'
 import { REASON_TEXT } from '../../../shared/reasons'
 import type { CalendarEvent, ScheduledItem } from '../../../shared/domain'
 import { Button, Icon, Modal, Segmented } from '../../components/ui'
@@ -28,9 +28,12 @@ export function CalendarPage() {
 
   const dates = datesFor(view, anchor)
   const weeks = [...new Set(dates.map(startOfWeek))]
-  const weekStart = weeks[0] // the plan panel below follows the first week on screen
+  const weekStart = startOfWeek(anchor) // the plan panel below follows the anchor's week (today's, by default)
   useAutoPlan(weeks) // every week on screen gets a proposed plan when it has none
   const plan = state.plans[weekStart]
+  // Day selector: seven days that stay put while you tap through them, and re-centre only when you leave them.
+  const [stripStart, setStripStart] = useState(addDays(today, -1))
+  if (anchor < stripStart || anchor > addDays(stripStart, 6)) setStripStart(addDays(anchor, -1))
   const move = (delta: number) => setAnchor(addDays(anchor, delta * STEP_DAYS[view]))
   const chooseView = (next: CalendarView) => {
     setView(next)
@@ -71,7 +74,7 @@ export function CalendarPage() {
 
       {(view === 'day' || view === '3days') && (
         <div className="day-tabs">
-          {weekDates(startOfWeek(anchor)).map((d) => (
+          {Array.from({ length: 7 }, (_, i) => addDays(stripStart, i)).map((d) => (
             <button key={d} className={dates.includes(d) ? 'on' : ''} onClick={() => setAnchor(d)}>{WEEKDAYS_SHORT[weekdayOf(d)]} {Number(d.slice(8))}</button>
           ))}
         </div>
