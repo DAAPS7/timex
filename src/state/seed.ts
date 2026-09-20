@@ -8,6 +8,10 @@ export const defaultPreferences = {
   dayEnd: '22:00',
   minBreakMinutes: 15,
   maxDailyPlannedMinutes: 480,
+  essentials: [
+    { id: 'ess-almoco', title: 'Almoço', start: '12:30', end: '13:30', kind: 'meal' as const },
+    { id: 'ess-jantar', title: 'Jantar', start: '19:30', end: '20:30', kind: 'meal' as const },
+  ],
 }
 
 export const emptyState = (): AppState => ({
@@ -22,7 +26,6 @@ export function seedState(): AppState {
   })
   const events = [
     ...[0, 1, 2, 3].map((d) => event(`uni-${d}`, 'Universidade', d, '09:00', '13:00')),
-    ...[0, 1, 2, 3, 4].map((d) => event(`lunch-${d}`, 'Almoço', d, '13:00', '14:00')),
     event('work-4', 'Trabalho', 4, '14:00', '18:00'),
     event('doc-3', 'Consulta', 3, '16:00', '17:00', false),
   ]

@@ -77,6 +77,12 @@ export function WeekGrid({ dates, today, dayStart, dayEnd, events, activities, p
                   <b>{transportLabel(b.modes)}</b>{b.start}–{b.end}
                 </div>
               ))}
+              {(plan?.result.essentialBlocks ?? []).filter((b) => b.date === date).map((b) => (
+                <div key={`${b.start}-essential`} className="block essential" title={b.title}
+                  style={{ top: top(Math.max(toMinutes(b.start), startMin), startMin), height: height(Math.max(toMinutes(b.start), startMin), toMinutes(b.end)) }}>
+                  <b>{b.title}</b>{b.start}–{b.end}
+                </div>
+              ))}
               {items.map((i) => (
                 <button key={i.id} className="block planned" onClick={() => onItem(i)}
                   style={{ top: top(toMinutes(i.start), startMin), height: height(toMinutes(i.start), toMinutes(i.end)), background: colorFor(i.activityId) }}>

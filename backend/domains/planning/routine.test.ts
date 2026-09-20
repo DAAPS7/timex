@@ -140,3 +140,30 @@ describe('several transport modes', () => {
     expect(preferencesSchema.safeParse({ ...input().preferences, commute: { modes: [], minutesPerDay: 45 } }).success).toBe(false)
   })
 })
+
+describe('essentials on top of free time', () => {
+  const lunch = { id: 'l', title: 'Almoço', start: '12:30', end: '13:30', kind: 'meal' as const }
+  const withEssentials = (o: Partial<PlanningInput> = {}) =>
+    input({ preferences: { ...input().preferences, essentials: [lunch] }, ...o })
+
+  it('reserves them every day and takes them out of the free time', () => {
+    const plan = generatePlan(withEssentials())
+    expect(plan.essentialBlocks!.filter((b) => b.title === 'Almoço')).toHaveLength(7)
+    expect(plan.availableMinutesByDay[WEEK]).toBe(14 * 60 - 60)
+  })
+
+  it('never plans an activity over them', () => {
+    const plan = generatePlan(withEssentials({ activities: [activity({ id: 'gym', sessionsPerWeek: 7, sessionMinutes: 240 })] }))
+    for (const i of plan.scheduledItems) expect(i.end <= '12:30' || i.start >= '13:30').toBe(true)
+  })
+
+  it('only keeps the part that is not already taken by a fixed event', () => {
+    const plan = generatePlan(withEssentials({ events: [event({ id: 'uni', start: '13:00', end: '17:00' })] }))
+    expect(plan.essentialBlocks!.find((b) => b.date === WEEK)).toMatchObject({ start: '12:30', end: '13:00' })
+    expect(plan.availableMinutesByDay[WEEK]).toBe(14 * 60 - 240 - 30)
+  })
+
+  it('does nothing when there are none', () => {
+    expect(generatePlan(input()).essentialBlocks).toEqual([])
+  })
+})

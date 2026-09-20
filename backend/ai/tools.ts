@@ -52,7 +52,7 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
   },
   get_routine: {
     description:
-      'Rotina do utilizador: horas de sono, transporte (modo, minutos por dia e ideias para o aproveitar) e compromissos fixos semanais.',
+      'Rotina do utilizador: horas de sono, transporte (modos, minutos por dia e ideias para o aproveitar), refeições/essenciais diários (reservados por cima do tempo livre) e compromissos fixos semanais.',
     args: null,
   },
   create_activity: {
@@ -142,6 +142,7 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
                 ideasToUseTheTime: [...new Set(commute.modes.flatMap((m) => TRANSPORT_TIPS[m]))],
               }
               : null,
+            essentials: (state.preferences.essentials ?? []).map((e) => ({ title: e.title, start: e.start, end: e.end, everyDay: true })),
             fixedCommitments: state.events
               .filter((e) => e.weekly)
               .map((e) => ({ title: e.title, weekday: WEEKDAYS_LONG[weekdayOf(e.date)], start: e.start, end: e.end })),

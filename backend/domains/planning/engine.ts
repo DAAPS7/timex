@@ -13,6 +13,7 @@ import type {
 import {
   computeAvailability,
   computeCommute,
+  computeEssentials,
   detectOverlappingEvents,
   subtractIntervals,
   sumMinutes,
@@ -76,7 +77,8 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   const dates = weekDates(input.weekStart)
   const lastDate = dates[dates.length - 1]
   const commuteBlocks = computeCommute(input, dates)
-  const free = computeAvailability(input, commuteBlocks)
+  const essentialBlocks = computeEssentials(input, dates, commuteBlocks)
+  const free = computeAvailability(input, commuteBlocks, essentialBlocks)
   const originalFree = structuredClone(free)
   const availableMinutesByDay = Object.fromEntries(dates.map((d) => [d, sumMinutes(free[d])]))
   // Free time left after planning: what was available minus the sessions that sit inside it (past sessions do not count).
@@ -191,6 +193,7 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     availableMinutesByDay,
     freeMinutesByDay: freeMinutesByDay(),
     commuteBlocks,
+    essentialBlocks,
     ...(input.previousItems ? { changes: describeChanges(items, keptIds, removed, input.today) } : {}),
   }
 }

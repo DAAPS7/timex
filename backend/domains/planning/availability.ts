@@ -1,7 +1,7 @@
 import { occursOn } from '../../../shared/events'
 import { wakingWindow } from '../../../shared/routine'
 import { toHHMM, toMinutes, weekDates } from '../../../shared/time'
-import type { CalendarEvent, CommuteBlock, PlanningInput, Warning } from '../../../shared/domain'
+import type { CalendarEvent, CommuteBlock, EssentialBlock, PlanningInput, Warning } from '../../../shared/domain'
 
 export interface Interval {
   start: number // minutes from midnight
@@ -92,14 +92,42 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
 }
 
 /**
- * Availability is derived, never stored: waking hours minus fixed events and commute time.
+ * Essentials (meals, etc.) are layered on top of free time: each daily block is kept only where it is not already taken
+ * by a fixed event or travel, and only inside waking hours.
+ */
+export function computeEssentials(input: PlanningInput, dates: string[], commute: CommuteBlock[]): EssentialBlock[] {
+  const { essentials = [], dayStart, dayEnd } = input.preferences
+  if (essentials.length === 0) return []
+  const waking = wakingWindow({ dayStart, dayEnd })
+  const busy = expandEvents(input.events, dates)
+  for (const b of commute) busy[b.date].push({ start: toMinutes(b.start), end: toMinutes(b.end) })
+  const blocks: EssentialBlock[] = []
+  for (const date of dates) {
+    if (date < input.today) continue
+    for (const e of essentials) {
+      const wanted: Interval = { start: Math.max(toMinutes(e.start), waking.start), end: Math.min(toMinutes(e.end), waking.end) }
+      if (wanted.end <= wanted.start) continue
+      for (const iv of subtractIntervals([wanted], busy[date])) {
+        blocks.push({ date, start: toHHMM(iv.start), end: toHHMM(iv.end), title: e.title, kind: e.kind })
+      }
+    }
+  }
+  return blocks.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+}
+
+/**
+ * Availability is derived, never stored: waking hours minus fixed events, then travel and essentials on top.
  * Days before `today` are unavailable (nothing is planned in the past), and so is the part of today before `nowMinutes`.
  */
-export function computeAvailability(input: PlanningInput, commute: CommuteBlock[] = computeCommute(input, weekDates(input.weekStart))): DayIntervals {
+export function computeAvailability(
+  input: PlanningInput,
+  commute: CommuteBlock[] = computeCommute(input, weekDates(input.weekStart)),
+  essentials: EssentialBlock[] = computeEssentials(input, weekDates(input.weekStart), commute),
+): DayIntervals {
   const { weekStart, today, events, preferences, nowMinutes } = input
   const dates = weekDates(weekStart)
   const busy = expandEvents(events, dates)
-  for (const b of commute) busy[b.date].push({ start: toMinutes(b.start), end: toMinutes(b.end) })
+  for (const b of [...commute, ...essentials]) busy[b.date].push({ start: toMinutes(b.start), end: toMinutes(b.end) })
   // Time that already went by today is gone.
   if (nowMinutes !== undefined && busy[today]) busy[today].push({ start: 0, end: nowMinutes })
   const waking: Interval = wakingWindow(preferences)

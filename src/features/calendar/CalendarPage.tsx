@@ -92,12 +92,14 @@ export function CalendarPage() {
         <span><i style={{ background: 'var(--text-2)' }} />Compromisso fixo</span>
         <span><i style={{ background: 'var(--accent)' }} />Atividade planeada</span>
         <span><i style={{ border: '1px dashed var(--amber)' }} />Transporte</span>
+        <span><i style={{ border: '1px dashed var(--green)' }} />Refeições e essenciais</span>
         <span><i style={{ border: '1.5px solid var(--sep)' }} />Tempo livre</span>
       </div>
 
       {plan ? (
         <PlanPanel plan={plan} activities={state.activities} busy={busy}
-          onAccept={() => dispatch({ type: 'acceptPlan', weekStart })} onRegenerate={() => generate(weekStart)} />
+          onAccept={() => dispatch({ type: 'acceptPlan', weekStart })} onRegenerate={() => generate(weekStart)}
+          onNextWeek={() => setAnchor(addDays(weekStart, 7))} />
       ) : (
         <div className="card muted">Ainda não há plano para esta semana. Adiciona atividades para o motor as encaixar no tempo livre.</div>
       )}

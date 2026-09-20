@@ -30,6 +30,7 @@ export function normalizeState(raw: unknown): AppState {
     events: list(r.events),
     activities: list(r.activities),
     goals: list(r.goals),
+    // `essentials` is missing in data saved before they existed: start from the default meals
     preferences: { ...defaultPreferences, ...prefs, ...(prefs.commute ? { commute: withModes(prefs.commute as any) } : {}) },
     plans: upgradePlans(plans),
     chat: list(r.chat),

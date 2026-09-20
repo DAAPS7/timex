@@ -4,7 +4,7 @@ import { usePlanning } from '../../hooks/usePlanning'
 import { emptyState, seedState } from '../../state/seed'
 import { useSession } from '../../state/session'
 import { useStore } from '../../state/store'
-import { CommuteFields, SleepFields } from './RoutineFields'
+import { CommuteFields, EssentialsFields, SleepFields } from './RoutineFields'
 
 export function SettingsPage() {
   const { state, dispatch } = useStore()
@@ -23,6 +23,10 @@ export function SettingsPage() {
       <Card>
         <CardHead title="Transporte" />
         <CommuteFields prefs={p} onChange={set} />
+      </Card>
+      <Card>
+        <CardHead title="Refeições e essenciais" />
+        <EssentialsFields prefs={p} onChange={set} />
       </Card>
       <Card>
         <CardHead title="Ritmo" />

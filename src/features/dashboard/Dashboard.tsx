@@ -41,6 +41,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const rows: Row[] = [
     ...state.events.filter((e) => occursOn(e, today)).map((e) => ({ key: e.id, start: e.start, end: e.end, title: e.title, color: 'var(--text-2)', fixed: true })),
     ...(plan?.result.commuteBlocks ?? []).filter((b) => b.date === today).map((b) => ({ key: `commute-${b.start}`, start: b.start, end: b.end, title: `Transporte · ${b.modes.map((m) => TRANSPORT_LABEL[m]).join(' + ')}`, color: 'var(--amber)', fixed: true })),
+    ...(plan?.result.essentialBlocks ?? []).filter((b) => b.date === today).map((b) => ({ key: `ess-${b.title}-${b.start}`, start: b.start, end: b.end, title: b.title, color: 'var(--green)', fixed: true })),
     ...todayItems.map((i) => ({ key: i.id, start: i.start, end: i.end, title: names.get(i.activityId) ?? 'Atividade', color: colorFor(i.activityId), fixed: false })),
   ].sort((a, b) => a.start.localeCompare(b.start))
 

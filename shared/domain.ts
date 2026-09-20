@@ -65,6 +65,19 @@ export const commuteSchema = z.preprocess(
 )
 export type Commute = z.infer<typeof commuteSchema>
 
+// Things that must happen every day regardless of the plan (meals, medication, a walk with the dog…). They sit on top of
+// free time: the engine reserves them after fixed events and travel, and never plans over them.
+export const essentialSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    title: z.string().min(1).max(60),
+    start: time,
+    end: time,
+    kind: z.enum(['meal', 'other']),
+  })
+  .refine((e) => e.end > e.start, { message: 'end must be after start', path: ['end'] })
+export type Essential = z.infer<typeof essentialSchema>
+
 export const preferencesSchema = z.object({
   timezone: z.string().min(1).max(64),
   dayStart: time, // start of the waking day; everything outside [dayStart, dayEnd] is sleep/unavailable
@@ -72,6 +85,7 @@ export const preferencesSchema = z.object({
   minBreakMinutes: z.number().int().min(0).max(120),
   maxDailyPlannedMinutes: z.number().int().min(60).max(960),
   commute: commuteSchema.optional(),
+  essentials: z.array(essentialSchema).max(12).optional(),
   setupDone: z.boolean().optional(), // the guided setup (fixed schedule, sleep, transport, activities) was finished or skipped
 })
 export type Preferences = z.infer<typeof preferencesSchema>
@@ -139,6 +153,14 @@ export interface CommuteBlock {
   modes: TransportMode[]
 }
 
+export interface EssentialBlock {
+  date: string
+  start: string
+  end: string
+  title: string
+  kind: Essential['kind']
+}
+
 // What a stable replan did to the previous plan, so the change can be shown and explained.
 export interface PlanChanges {
   kept: number
@@ -159,6 +181,7 @@ export interface PlanningResult {
   availableMinutesByDay: Record<string, number> // free before planning: waking hours minus events, commute and elapsed time
   freeMinutesByDay: Record<string, number> // still free after the planned sessions
   commuteBlocks?: CommuteBlock[]
+  essentialBlocks?: EssentialBlock[]
   changes?: PlanChanges // only when the plan was built from previousItems
 }
 

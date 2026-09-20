@@ -1,8 +1,9 @@
 import { sleepMinutes } from '../../../shared/routine'
 import { formatDuration } from '../../../shared/time'
 import { TRANSPORT_LABEL, TRANSPORT_TIPS } from '../../../shared/transport'
-import type { Preferences, TransportMode } from '../../../shared/domain'
-import { Field } from '../../components/ui'
+import type { Essential, Preferences, TransportMode } from '../../../shared/domain'
+import { Button, Field, Icon } from '../../components/ui'
+import { newId } from '../../utils/ids'
 
 interface Props {
   prefs: Preferences
@@ -58,6 +59,37 @@ export function CommuteFields({ prefs, onChange }: Props) {
         <div className="notice" style={{ marginTop: 12 }}>
           <b>Como aproveitar {formatDuration(commute.minutesPerDay)} de {labels}:</b>
           <ul className="tip-list small">{tips.map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** Daily essentials (meals, medication…): reserved on top of free time and never planned over. */
+export function EssentialsFields({ prefs, onChange }: Props) {
+  const list = prefs.essentials ?? []
+  const set = (essentials: Essential[]) => onChange({ essentials })
+  const patch = (id: string, change: Partial<Essential>) => set(list.map((e) => (e.id === id ? { ...e, ...change } : e)))
+  const add = (kind: Essential['kind']) =>
+    set([...list, { id: newId('ess'), title: kind === 'meal' ? 'Refeição' : 'Essencial', start: '16:00', end: '16:30', kind }])
+  return (
+    <>
+      <p className="small muted" style={{ marginBottom: 12 }}>
+        Tudo o que não está ocupado é tempo livre. Por cima dele reservo estas coisas todos os dias, e o plano nunca lhes toca.
+      </p>
+      {list.map((e) => (
+        <div key={e.id} className="essential-row">
+          <input className="input" value={e.title} maxLength={60} aria-label="Nome" onChange={(ev) => patch(e.id, { title: ev.target.value })} />
+          <input className="input" type="time" value={e.start} aria-label="Início" onChange={(ev) => patch(e.id, { start: ev.target.value })} />
+          <input className="input" type="time" value={e.end} aria-label="Fim" onChange={(ev) => patch(e.id, { end: ev.target.value })} />
+          <Button variant="danger" icon aria-label={`Remover ${e.title}`} onClick={() => set(list.filter((x) => x.id !== e.id))}><Icon name="trash" size={16} /></Button>
+          {e.end <= e.start && <span className="small" style={{ color: 'var(--red)', gridColumn: '1 / -1' }}>O fim tem de ser depois do início.</span>}
+        </div>
+      ))}
+      {list.length < 12 && (
+        <div className="row">
+          <Button small variant="tinted" onClick={() => add('meal')}><Icon name="plus" size={14} />Refeição</Button>
+          <Button small variant="tinted" onClick={() => add('other')}><Icon name="plus" size={14} />Outro essencial</Button>
         </div>
       )}
     </>

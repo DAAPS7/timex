@@ -1,5 +1,5 @@
 import { CONFLICT_TEXT } from '../../../shared/reasons'
-import { formatDuration, weekdayOf, WEEKDAYS_SHORT } from '../../../shared/time'
+import { addDays, daysBetween, formatDuration, todayLocal, weekdayOf, WEEKDAYS_SHORT } from '../../../shared/time'
 import type { Activity, Plan, ScheduledItem } from '../../../shared/domain'
 import { Button, Card, CardHead } from '../../components/ui'
 
@@ -20,14 +20,17 @@ interface Props {
   busy: boolean
   onAccept: () => void
   onRegenerate: () => void
+  onNextWeek?: () => void
 }
 
 const when = (i: ScheduledItem) => `${WEEKDAYS_SHORT[weekdayOf(i.date)]} ${i.start}`
 
 /** Explains the current plan: feasibility, trade-offs and what the user can do about them. */
-export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate }: Props) {
+export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate, onNextWeek }: Props) {
   const { result } = plan
   const names = new Map(activities.map((a) => [a.id, a.name]))
+  // Days that already went by are never planned and count as 0 free: say so instead of looking like a lack of time.
+  const pastDays = Math.max(0, Math.min(7, daysBetween(plan.weekStart, todayLocal())))
   const pct = result.requestedMinutes === 0 ? 100 : Math.round((result.scheduledMinutes / result.requestedMinutes) * 100)
 
   return (
@@ -42,6 +45,13 @@ export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate }: Pr
       </div>
       <div className="bar"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
 
+      {pastDays > 0 && addDays(plan.weekStart, 6) >= todayLocal() && (
+        <div className="notice" style={{ marginTop: 12 }}>
+          <b>{pastDays === 1 ? 'Já passou 1 dia' : `Já passaram ${pastDays} dias`} desta semana.</b> Não se planeia no passado, por isso só contam os dias que restam
+          {onNextWeek ? '.' : ' e o tempo livre deles.'}
+          {onNextWeek && <div style={{ marginTop: 8 }}><Button small variant="tinted" onClick={onNextWeek}>Ver e planear a próxima semana</Button></div>}
+        </div>
+      )}
       {result.changes && (result.changes.moved.length > 0 || result.changes.dropped.length > 0 || result.changes.added.length > 0) && (
         <div className="notice" style={{ marginTop: 12 }}>
           <b>O plano ajustou-se a uma alteração.</b> Mantive {result.changes.kept} {result.changes.kept === 1 ? 'sessão' : 'sessões'} onde estavam.
@@ -56,7 +66,7 @@ export function PlanPanel({ plan, activities, busy, onAccept, onRegenerate }: Pr
         <div key={c.activityId} className="notice" style={{ marginTop: 12 }}>
           <b>{CONFLICT_TEXT[c.code]}: {names.get(c.activityId) ?? c.activityId}.</b>{' '}
           Precisa de {formatDuration(c.requestedMinutes)}, só há {formatDuration(c.scheduledMinutes)} encaixadas
-          ({formatDuration(c.availableInWindowMinutes)} livres{c.deadline ? ` até ${c.deadline}` : ''}).
+          ({formatDuration(c.availableInWindowMinutes)} livres nos dias que restam{c.deadline ? ` até ${c.deadline}` : ''}).
           <div className="small muted">Opções: usar horários menos preferidos, reduzir outras atividades ou baixar o objetivo.</div>
         </div>
       ))}

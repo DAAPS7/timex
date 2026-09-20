@@ -16,6 +16,7 @@ export function AgendaView({ dates, today, events, activities, plans, onEvent, o
         const rows: Row[] = [
           ...events.filter((e) => occursOn(e, date)).map((e) => ({ key: e.id, start: e.start, end: e.end, title: e.title, color: 'var(--text-2)', onClick: () => onEvent(e) })),
           ...(plan?.result.commuteBlocks ?? []).filter((b) => b.date === date).map((b) => ({ key: `c-${b.start}`, start: b.start, end: b.end, title: `Transporte · ${transportLabel(b.modes)}`, color: 'var(--amber)' })),
+          ...(plan?.result.essentialBlocks ?? []).filter((b) => b.date === date).map((b) => ({ key: `e-${b.title}-${b.start}`, start: b.start, end: b.end, title: b.title, color: 'var(--green)' })),
           ...(plan?.result.scheduledItems ?? []).filter((i) => i.date === date).map((i) => ({ key: i.id, start: i.start, end: i.end, title: names.get(i.activityId) ?? 'Atividade', color: colorFor(i.activityId), onClick: () => onItem(i) })),
         ].sort((a, b) => a.start.localeCompare(b.start))
         const free = freeLabel(plan, date, today)

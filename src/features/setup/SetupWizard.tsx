@@ -6,9 +6,9 @@ import { usePlanning } from '../../hooks/usePlanning'
 import { useStore } from '../../state/store'
 import { ActivityForm } from '../activities/ActivityForm'
 import { EventForm } from '../calendar/EventForm'
-import { CommuteFields, SleepFields } from '../settings/RoutineFields'
+import { CommuteFields, EssentialsFields, SleepFields } from '../settings/RoutineFields'
 
-const STEPS = ['Horários fixos', 'Sono', 'Transporte', 'Atividades', 'Pronto'] as const
+const STEPS = ['Horários fixos', 'Sono e refeições', 'Transporte', 'Atividades', 'Pronto'] as const
 
 /** Guided first-run setup: fixed schedule, sleep, transport, then the activities the user wants to fit in. */
 export function SetupWizard({ onDone }: { onDone: () => void }) {
@@ -60,6 +60,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
         <Card>
           <p className="muted" style={{ marginBottom: 14 }}>O sono é sagrado: o plano nunca marca nada fora das tuas horas acordado.</p>
           <SleepFields prefs={p} onChange={setPrefs} />
+          <h3 style={{ margin: '18px 0 6px' }}>Refeições e essenciais</h3>
+          <EssentialsFields prefs={p} onChange={setPrefs} />
         </Card>
       )}
 

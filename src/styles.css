@@ -299,6 +299,11 @@ input.input { height: 48px; }
 /* Transport blocks: hollow and dashed, so they read as "time in transit" rather than a commitment */
 .block.commute { background: transparent; border: 1px dashed color-mix(in srgb, var(--amber) 70%, transparent); color: var(--amber); cursor: default; padding: 2px 6px; }
 .block.commute b { font-weight: 600; }
+/* Essentials (meals…): layered on free time, hollow like transport but green */
+.block.essential { background: transparent; border: 1px dashed color-mix(in srgb, var(--green) 70%, transparent); color: var(--green); cursor: default; padding: 2px 6px; }
+.block.essential b { font-weight: 600; }
+.essential-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+@media (max-width: 820px) { .essential-row { grid-template-columns: 1fr 1fr auto; } .essential-row > :first-child { grid-column: 1 / -1; } }
 .steps { display: flex; gap: 6px; margin-bottom: 18px; }
 .steps i { flex: 1; height: 4px; border-radius: 4px; background: var(--card-2); }
 .steps i.done { background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 10px rgba(var(--glow), 0.6); }
