@@ -1,0 +1,32 @@
+name: Timex
+options:
+  bundleIdPrefix: app.timex
+  deploymentTarget:
+    iOS: "26.0" # Liquid Glass (glassEffect, GlassEffectContainer, .glass button styles) needs iOS 26 and Xcode 26
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Timex:
+    type: application
+    platform: iOS
+    sources:
+      - path: Timex
+    info:
+      path: Timex/Info.plist
+      properties:
+        CFBundleDisplayName: Timex
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Default server. Can be changed on the sign-in screen ("Servidor").
+        TimexAPIBaseURL: http://localhost:8787
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true # lets a simulator/phone reach the local dev server over http
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.timex.Timex
+        TARGETED_DEVICE_FAMILY: "1,2"

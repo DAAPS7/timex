@@ -3,3 +3,10 @@ dist
 .wrangler
 .dev.vars
 .env*
+
+# iOS
+ios/Timex.xcodeproj
+ios/build
+ios/Timex/Info.plist
+*.xcuserstate
+xcuserdata/
