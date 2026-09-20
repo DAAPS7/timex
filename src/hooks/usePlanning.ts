@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { addDays, startOfWeek, todayLocal } from '../../shared/time'
-import type { PlanningResult } from '../../shared/domain'
+import type { Plan, PlanningResult } from '../../shared/domain'
 import { planningApi } from '../services/api/client'
 import { useStore, type AppState } from '../state/store'
 import { buildPlanningInput } from '../utils/planningInput'
@@ -11,11 +11,11 @@ export function usePlanning() {
   const [error, setError] = useState<string | null>(null)
 
   const adopt = useCallback(
-    (weekStart: string, result: PlanningResult) => {
+    (weekStart: string, result: PlanningResult, status: Plan['status'] = 'proposed') => {
       const version = (state.plans[weekStart]?.version ?? 0) + 1
       dispatch({
         type: 'setPlan',
-        plan: { id: `plan-${weekStart}`, weekStart, status: 'proposed', version, createdAt: new Date().toISOString(), result },
+        plan: { id: `plan-${weekStart}`, weekStart, status, version, createdAt: new Date().toISOString(), result },
       })
     },
     [state.plans, dispatch],

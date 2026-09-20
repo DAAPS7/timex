@@ -30,3 +30,21 @@ describe('assistant (rule-based provider)', () => {
     expect(r.proposals[0]).toMatchObject({ type: 'create_goal', payload: { deadline: '2026-10-05', title: 'Exame de Algoritmos' } })
   })
 })
+
+describe('assistant weekly plans', () => {
+  it('proposes a plan for the next week when asked, marking which week it is for', async () => {
+    const r = await ask('Planeia a próxima semana')
+    expect(r.planWeekStart).toBe('2026-09-21')
+    expect(r.plan?.scheduledItems.every((i) => i.date >= '2026-09-21')).toBe(true)
+    expect(r.reply).toContain('proposta')
+  })
+  it('moves to the next week on its own when almost nothing is left in this one', async () => {
+    const lateSunday = { ...state, today: '2026-09-20', weekStart: '2026-09-14', nowMinutes: 21 * 60 + 30 }
+    const r = await handleAssistantMessage({ message: 'Planeia a minha semana', state: lateSunday })
+    expect(r.planWeekStart).toBe('2026-09-21')
+    expect(r.reply).toContain('próxima')
+  })
+  it('plans the current week when there is time left', async () => {
+    expect((await ask('Planeia a minha semana')).planWeekStart).toBe('2026-09-14')
+  })
+})

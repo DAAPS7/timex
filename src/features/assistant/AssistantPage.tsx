@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { formatDuration, WEEKDAYS_SHORT, weekdayOf } from '../../../shared/time'
+import type { PlanningResult } from '../../../shared/domain'
 import { Button, Card, Icon } from '../../components/ui'
 import { useStore } from '../../state/store'
 import { useAssistant } from './useAssistant'
 
 const SUGGESTIONS = [
   'Planeia a minha semana',
+  'Planeia a próxima semana',
   'Quero estudar 6 horas esta semana e ir ao ginásio 4 vezes',
   'Consigo encaixar 3 horas de programação?',
   'Tenho um exame de Estruturas de Dados em 3 semanas',
@@ -15,9 +18,10 @@ const SUGGESTIONS = [
 
 export function AssistantPage() {
   const { state } = useStore()
-  const { send, applyAndPlan, adoptPlan, busy } = useAssistant()
+  const { send, applyAndPlan, approvePlan, rejectPlan, busy } = useAssistant()
   const [text, setText] = useState('')
   const end = useRef<HTMLDivElement>(null)
+  const names = new Map(state.activities.map((a) => [a.id, a.name]))
 
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,9 +57,16 @@ export function AssistantPage() {
               )}
               {m.plan && m.planAdoptable && m.plan.scheduledItems.length > 0 && (
                 <div className="proposal">
-                  <b>Plano proposto</b>
-                  <div className="small">{m.plan.scheduledItems.length} sessões planeadas</div>
-                  <div className="row"><Button small disabled={m.handled} onClick={() => adoptPlan(m)}>{m.handled ? 'Adicionado ao calendário' : 'Usar este plano'}</Button></div>
+                  <b>Plano semanal proposto</b>
+                  <PlanSummary plan={m.plan} names={names} />
+                  {m.planDecision === 'approved' && <div className="small" style={{ color: 'var(--green)' }}>Aprovado e adicionado ao calendário.</div>}
+                  {m.planDecision === 'rejected' && <div className="small muted">Rejeitado. Nada foi alterado no calendário.</div>}
+                  {!m.planDecision && (
+                    <div className="row">
+                      <Button small onClick={() => approvePlan(m)}>Aprovar plano</Button>
+                      <Button small variant="plain" onClick={() => rejectPlan(m)}>Rejeitar</Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -71,6 +82,25 @@ export function AssistantPage() {
           <Button icon disabled={busy || !text.trim()} aria-label="Enviar"><Icon name="send" size={18} /></Button>
         </form>
       </Card>
+    </>
+  )
+}
+
+/** The proposed week at a glance, day by day, so the user can decide without opening the calendar. */
+function PlanSummary({ plan, names }: { plan: PlanningResult; names: Map<string, string> }) {
+  const byDay = new Map<string, PlanningResult['scheduledItems']>()
+  for (const i of plan.scheduledItems) byDay.set(i.date, [...(byDay.get(i.date) ?? []), i])
+  return (
+    <>
+      <div className="small muted">{formatDuration(plan.scheduledMinutes)} planeadas de {formatDuration(plan.requestedMinutes)} pedidas · {plan.scheduledItems.length} sessões</div>
+      <ul className="tip-list small" style={{ marginTop: 0 }}>
+        {[...byDay].map(([date, items]) => (
+          <li key={date}>
+            <b>{WEEKDAYS_SHORT[weekdayOf(date)]} {Number(date.slice(8))}:</b>{' '}
+            {items.map((i) => `${names.get(i.activityId) ?? 'Atividade'} ${i.start}–${i.end}`).join(', ')}
+          </li>
+        ))}
+      </ul>
     </>
   )
 }

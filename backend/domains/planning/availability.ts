@@ -85,7 +85,7 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
     const go = { start: Math.max(wake, first - before), end: first }
     const back = { start: last, end: Math.min(bed, last + after) }
     for (const b of [go, back]) {
-      if (b.end > b.start) blocks.push({ date, start: toHHMM(b.start), end: toHHMM(b.end), mode: commute.mode })
+      if (b.end > b.start) blocks.push({ date, start: toHHMM(b.start), end: toHHMM(b.end), modes: commute.modes })
     }
   }
   return blocks
@@ -93,13 +93,15 @@ export function computeCommute(input: PlanningInput, dates: string[]): CommuteBl
 
 /**
  * Availability is derived, never stored: waking hours minus fixed events and commute time.
- * Days before `today` are unavailable (nothing is planned in the past).
+ * Days before `today` are unavailable (nothing is planned in the past), and so is the part of today before `nowMinutes`.
  */
 export function computeAvailability(input: PlanningInput, commute: CommuteBlock[] = computeCommute(input, weekDates(input.weekStart))): DayIntervals {
-  const { weekStart, today, events, preferences } = input
+  const { weekStart, today, events, preferences, nowMinutes } = input
   const dates = weekDates(weekStart)
   const busy = expandEvents(events, dates)
   for (const b of commute) busy[b.date].push({ start: toMinutes(b.start), end: toMinutes(b.end) })
+  // Time that already went by today is gone.
+  if (nowMinutes !== undefined && busy[today]) busy[today].push({ start: 0, end: nowMinutes })
   const waking: Interval = wakingWindow(preferences)
   const free: DayIntervals = {}
   for (const date of dates) {

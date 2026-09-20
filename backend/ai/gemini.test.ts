@@ -82,7 +82,7 @@ describe('routine tools', () => {
   })
 
   it('gives transport ideas from get_routine and says so when no transport is defined', async () => {
-    const prefs = { ...state.preferences, commute: { mode: 'train' as const, minutesPerDay: 80 } }
+    const prefs = { ...state.preferences, commute: { modes: ['train' as const], minutesPerDay: 80 } }
     const withCommute = await handleAssistantMessage({ message: 'como aproveito o transporte?', state: { ...state, preferences: prefs } })
     expect(withCommute.reply).toContain('1h20')
     expect(withCommute.reply).toContain('•')

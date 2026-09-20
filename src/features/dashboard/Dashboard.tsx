@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { daysBetween, formatDuration, startOfWeek, todayLocal, toMinutes, WEEKDAYS_LONG, weekdayOf } from '../../../shared/time'
+import { daysBetween, formatDuration, nowLocalMinutes, startOfWeek, todayLocal, toMinutes, WEEKDAYS_LONG, weekdayOf } from '../../../shared/time'
 import { occursOn } from '../../../shared/events'
 import { TRANSPORT_LABEL, TRANSPORT_TIPS } from '../../../shared/transport'
 import { Button, Card, CardHead, Empty, Icon } from '../../components/ui'
@@ -34,9 +34,13 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
   const todayItems = plan?.result.scheduledItems.filter((i) => i.date === today) ?? []
   const plannedToday = todayItems.reduce((n, i) => n + toMinutes(i.end) - toMinutes(i.start), 0)
+  // Fresh availability (already excludes what has elapsed) minus the planned sessions that are still ahead.
+  const now = nowLocalMinutes()
+  const plannedAhead = todayItems.reduce((n, i) => n + Math.max(0, toMinutes(i.end) - Math.max(toMinutes(i.start), now)), 0)
+  const free = freeToday === null ? null : Math.max(0, freeToday - plannedAhead)
   const rows: Row[] = [
     ...state.events.filter((e) => occursOn(e, today)).map((e) => ({ key: e.id, start: e.start, end: e.end, title: e.title, color: 'var(--text-2)', fixed: true })),
-    ...(plan?.result.commuteBlocks ?? []).filter((b) => b.date === today).map((b) => ({ key: `commute-${b.start}`, start: b.start, end: b.end, title: `Transporte · ${TRANSPORT_LABEL[b.mode]}`, color: 'var(--amber)', fixed: true })),
+    ...(plan?.result.commuteBlocks ?? []).filter((b) => b.date === today).map((b) => ({ key: `commute-${b.start}`, start: b.start, end: b.end, title: `Transporte · ${b.modes.map((m) => TRANSPORT_LABEL[m]).join(' + ')}`, color: 'var(--amber)', fixed: true })),
     ...todayItems.map((i) => ({ key: i.id, start: i.start, end: i.end, title: names.get(i.activityId) ?? 'Atividade', color: colorFor(i.activityId), fixed: false })),
   ].sort((a, b) => a.start.localeCompare(b.start))
 
@@ -77,7 +81,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
       </Card>
 
       <div className="grid three" style={{ margin: '16px 0' }}>
-        <Card><div className="stat"><span className="muted small">Livre hoje</span><b style={{ color: 'var(--green)' }}>{freeToday === null ? '—' : formatDuration(Math.max(0, freeToday - plannedToday))}</b><span className="small muted">depois de compromissos, sono e plano</span></div></Card>
+        <Card><div className="stat"><span className="muted small">Livre hoje</span><b style={{ color: 'var(--green)' }}>{free === null ? '—' : formatDuration(free)}</b><span className="small muted">daqui até deitares, depois de compromissos e plano</span></div></Card>
         <Card><div className="stat"><span className="muted small">Planeado hoje</span><b style={{ color: 'var(--accent)' }}>{formatDuration(plannedToday)}</b><span className="small muted">{todayItems.length} sessões</span></div></Card>
         <Card><div className="stat"><span className="muted small">Semana</span><b style={{ color: 'var(--orange)' }}>{plan ? `${plan.result.requestedMinutes ? Math.round((plan.result.scheduledMinutes / plan.result.requestedMinutes) * 100) : 100}%` : '—'}</b><span className="small muted">{plan ? 'do pedido encaixado' : 'ainda sem plano'}</span></div></Card>
       </div>
@@ -111,8 +115,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
           {commute && commute.minutesPerDay > 0 && (
             <Card>
               <CardHead title="Aproveitar o transporte" />
-              <p className="small muted">{TRANSPORT_LABEL[commute.mode]} · {formatDuration(commute.minutesPerDay)} por dia</p>
-              <ul className="tip-list small">{TRANSPORT_TIPS[commute.mode].slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
+              <p className="small muted">{commute.modes.map((m) => TRANSPORT_LABEL[m]).join(' + ')} · {formatDuration(commute.minutesPerDay)} por dia</p>
+              <ul className="tip-list small">{[...new Set(commute.modes.flatMap((m) => TRANSPORT_TIPS[m].slice(0, 2)))].slice(0, 3).map((t) => <li key={t}>{t}</li>)}</ul>
             </Card>
           )}
           <Card>

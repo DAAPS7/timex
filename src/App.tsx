@@ -20,7 +20,7 @@ export function App() {
     return PAGES.includes(hash) ? hash : 'dashboard'
   })
   const setupDone = !!state.preferences.setupDone
-  useAutoPlan(startOfWeek(todayLocal()), setupDone) // the current week always has a plan (proposed) once there are activities
+  useAutoPlan([startOfWeek(todayLocal())], setupDone) // the current week always has a plan (proposed) once there are activities
 
   if (!setupDone) return <SetupWizard onDone={() => setPage('calendar')} />
 

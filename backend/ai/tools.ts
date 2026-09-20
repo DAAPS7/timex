@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { TRANSPORT_LABEL, TRANSPORT_TIPS } from '../../shared/transport'
 import { sleepMinutes } from '../../shared/routine'
-import { WEEKDAYS_LONG, weekdayOf } from '../../shared/time'
+import { addDays, WEEKDAYS_LONG, weekdayOf } from '../../shared/time'
 import {
   activitySchema,
   calendarEventDraftSchema,
@@ -35,6 +35,7 @@ const activityDraft = activitySchema.omit({ id: true }).extend({ dryRun: z.boole
 const goalDraft = goalSchema.omit({ id: true })
 const eventDraft = calendarEventDraftSchema
 const noArgs = z.object({}).strict()
+const weekArgs = z.object({ week: z.enum(['current', 'next']).optional() }).strict()
 
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -44,8 +45,10 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
   get_activities: { description: 'Lista as atividades que o utilizador já tem.', args: null },
   get_goals: { description: 'Lista os objetivos (com prazo) que o utilizador já tem.', args: null },
   get_availability: {
-    description: 'Minutos livres por dia (AAAA-MM-DD) nesta semana, depois de compromissos fixos e sono.',
-    args: null,
+    description:
+      'Minutos livres por dia (AAAA-MM-DD), depois de compromissos fixos, transporte e sono. Dias que já passaram e a parte de hoje que ' +
+      'já passou contam 0. week="next" para a semana seguinte (por omissão, a semana atual).',
+    args: weekArgs,
   },
   get_routine: {
     description:
@@ -66,8 +69,10 @@ export const TOOL_SPECS: Record<ToolName, { description: string; args: z.ZodType
     args: eventDraft,
   },
   generate_plan: {
-    description: 'Executa o motor de planeamento para a semana atual, incluindo as atividades/objetivos propostos nesta conversa.',
-    args: null,
+    description:
+      'Executa o motor de planeamento para uma semana, incluindo as atividades/objetivos propostos nesta conversa. O resultado é uma ' +
+      'PROPOSTA de plano semanal que o utilizador aprova ou rejeita. week="next" para a semana seguinte (por omissão, a semana atual).',
+    args: weekArgs,
   },
   explain_plan: { description: 'Devolve as sessões do plano que o utilizador está a ver, com os motivos de cada uma.', args: null },
 }
@@ -76,6 +81,7 @@ export interface ToolRunner {
   call(name: ToolName, args?: unknown): unknown
   readonly proposals: ProposedAction[]
   readonly plan?: PlanningResult
+  readonly planWeekStart?: string
   readonly hasDrafts: boolean
 }
 
@@ -86,20 +92,27 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
   const draftEvents: CalendarEvent[] = []
   const proposals: ProposedAction[] = []
   let plan: PlanningResult | undefined
+  let planWeekStart: string | undefined
 
-  const withDrafts = (): PlanningInput => ({
+  const weekStartFor = (week: 'current' | 'next' | undefined) => (week === 'next' ? addDays(state.weekStart, 7) : state.weekStart)
+
+  const withDrafts = (week: 'current' | 'next' | undefined): PlanningInput => ({
     ...state,
+    weekStart: weekStartFor(week),
     activities: [...state.activities.filter((a) => !draftActivities.some((d) => d.id === a.id)), ...draftActivities],
     goals: [...state.goals.filter((g) => !draftGoals.some((d) => d.id === g.id)), ...draftGoals],
     events: [...state.events.filter((e) => !draftEvents.some((d) => d.id === e.id)), ...draftEvents],
-    // with a plan on screen, replan around what changed instead of starting from scratch
-    ...(currentItems.length > 0 ? { previousItems: currentItems } : {}),
+    // with the current week's plan on screen, replan around what changed instead of starting from scratch
+    ...(currentItems.length > 0 && week !== 'next' ? { previousItems: currentItems } : {}),
   })
 
   return {
     proposals,
     get plan() {
       return plan
+    },
+    get planWeekStart() {
+      return planWeekStart
     },
     get hasDrafts() {
       return draftActivities.length + draftGoals.length + draftEvents.length > 0
@@ -113,8 +126,8 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
           noArgs.parse(args)
           return state.goals
         case 'get_availability': {
-          noArgs.parse(args)
-          const { availableMinutesByDay } = generatePlan({ ...state, activities: [] })
+          const { week } = weekArgs.parse(args)
+          const { availableMinutesByDay } = generatePlan({ ...state, weekStart: weekStartFor(week), activities: [] })
           return availableMinutesByDay
         }
         case 'get_routine': {
@@ -123,7 +136,11 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
           return {
             sleep: { wakeTime: dayStart, bedTime: dayEnd, sleepHours: Math.round((sleepMinutes(state.preferences) / 60) * 10) / 10 },
             commute: commute && commute.minutesPerDay > 0
-              ? { mode: TRANSPORT_LABEL[commute.mode], minutesPerDay: commute.minutesPerDay, ideasToUseTheTime: TRANSPORT_TIPS[commute.mode] }
+              ? {
+                modes: commute.modes.map((m) => TRANSPORT_LABEL[m]),
+                minutesPerDay: commute.minutesPerDay,
+                ideasToUseTheTime: [...new Set(commute.modes.flatMap((m) => TRANSPORT_TIPS[m]))],
+              }
               : null,
             fixedCommitments: state.events
               .filter((e) => e.weekly)
@@ -168,8 +185,9 @@ export function createToolRunner(state: PlanningInput, currentItems: ScheduledIt
           return event
         }
         case 'generate_plan': {
-          noArgs.parse(args)
-          plan = generatePlan(withDrafts())
+          const { week } = weekArgs.parse(args)
+          plan = generatePlan(withDrafts(week))
+          planWeekStart = weekStartFor(week)
           return plan
         }
         case 'explain_plan': {

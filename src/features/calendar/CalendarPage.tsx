@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { addDays, startOfWeek, todayLocal, weekDates, weekdayOf, WEEKDAYS_SHORT, WEEKDAYS_LONG } from '../../../shared/time'
 import { REASON_TEXT } from '../../../shared/reasons'
 import type { CalendarEvent, ScheduledItem } from '../../../shared/domain'
-import { Button, Icon, Modal } from '../../components/ui'
+import { Button, Icon, Modal, Segmented } from '../../components/ui'
 import { useAutoPlan } from '../../hooks/useAutoPlan'
 import { usePlanning } from '../../hooks/usePlanning'
 import { useStore } from '../../state/store'
 import { PlanPanel } from '../planning/PlanPanel'
+import { AgendaView } from './AgendaView'
 import { EventForm } from './EventForm'
+import { datesFor, loadView, saveView, STEP_DAYS, VIEW_OPTIONS, type CalendarView } from './views'
 import { WeekGrid } from './WeekGrid'
 
 const monthName = (d: string) => {
@@ -19,17 +21,20 @@ export function CalendarPage() {
   const { state, dispatch } = useStore()
   const { generate, replanAffected, busy, error } = usePlanning()
   const today = todayLocal()
-  const [weekStart, setWeekStart] = useState(startOfWeek(today))
-  const [selectedDay, setSelectedDay] = useState(weekDates(weekStart).includes(today) ? today : weekStart)
+  const [view, setView] = useState<CalendarView>(loadView)
+  const [anchor, setAnchor] = useState(today) // first day shown (day / 3 days) or any day of the week shown
   const [editing, setEditing] = useState<CalendarEvent | 'new' | null>(null)
   const [viewing, setViewing] = useState<ScheduledItem | null>(null)
 
-  useAutoPlan(weekStart) // every week gets a proposed plan when it has none
+  const dates = datesFor(view, anchor)
+  const weeks = [...new Set(dates.map(startOfWeek))]
+  const weekStart = weeks[0] // the plan panel below follows the first week on screen
+  useAutoPlan(weeks) // every week on screen gets a proposed plan when it has none
   const plan = state.plans[weekStart]
-  const goToWeek = (delta: number) => {
-    const next = addDays(weekStart, delta * 7)
-    setWeekStart(next)
-    setSelectedDay(weekDates(next).includes(today) ? today : next)
+  const move = (delta: number) => setAnchor(addDays(anchor, delta * STEP_DAYS[view]))
+  const chooseView = (next: CalendarView) => {
+    setView(next)
+    saveView(next)
   }
   const activity = viewing && state.activities.find((a) => a.id === viewing.activityId)
 
@@ -49,12 +54,12 @@ export function CalendarPage() {
       <div className="page-head">
         <div>
           <h1>Calendário</h1>
-          <p className="muted">{monthName(weekStart)}</p>
+          <p className="muted">{monthName(dates[0])}</p>
         </div>
         <div className="row">
-          <Button variant="plain" icon onClick={() => goToWeek(-1)} aria-label="Semana anterior"><Icon name="left" size={18} /></Button>
-          <Button variant="plain" onClick={() => { setWeekStart(startOfWeek(today)); setSelectedDay(today) }}>Hoje</Button>
-          <Button variant="plain" icon onClick={() => goToWeek(1)} aria-label="Semana seguinte"><Icon name="right" size={18} /></Button>
+          <Button variant="plain" icon onClick={() => move(-1)} aria-label="Anterior"><Icon name="left" size={18} /></Button>
+          <Button variant="plain" onClick={() => setAnchor(today)}>Hoje</Button>
+          <Button variant="plain" icon onClick={() => move(1)} aria-label="Seguinte"><Icon name="right" size={18} /></Button>
           <Button variant="tinted" onClick={() => setEditing('new')}><Icon name="plus" size={16} />Evento</Button>
           <Button onClick={() => generate(weekStart)} disabled={busy}><Icon name="sparkle" size={16} />{busy ? 'A gerar…' : plan ? 'Replanear' : 'Gerar plano'}</Button>
         </div>
@@ -62,18 +67,26 @@ export function CalendarPage() {
 
       {error && <div className="notice" style={{ marginBottom: 12 }}>{error}</div>}
 
-      <div className="day-tabs">
-        {weekDates(weekStart).map((d) => (
-          <button key={d} className={d === selectedDay ? 'on' : ''} onClick={() => setSelectedDay(d)}>{WEEKDAYS_SHORT[weekdayOf(d)]} {Number(d.slice(8))}</button>
-        ))}
-      </div>
+      <div className="view-picker"><Segmented options={VIEW_OPTIONS} value={view} onChange={chooseView} /></div>
 
-      <WeekGrid
-        weekStart={weekStart} today={today} selectedDay={selectedDay}
-        dayStart={state.preferences.dayStart} dayEnd={state.preferences.dayEnd}
-        events={state.events} activities={state.activities} plan={plan}
-        onEvent={setEditing} onItem={setViewing}
-      />
+      {(view === 'day' || view === '3days') && (
+        <div className="day-tabs">
+          {weekDates(startOfWeek(anchor)).map((d) => (
+            <button key={d} className={dates.includes(d) ? 'on' : ''} onClick={() => setAnchor(d)}>{WEEKDAYS_SHORT[weekdayOf(d)]} {Number(d.slice(8))}</button>
+          ))}
+        </div>
+      )}
+
+      {view === 'agenda' ? (
+        <AgendaView dates={dates} today={today} events={state.events} activities={state.activities} plans={state.plans} onEvent={setEditing} onItem={setViewing} />
+      ) : (
+        <WeekGrid
+          dates={dates} today={today} plans={state.plans}
+          dayStart={state.preferences.dayStart} dayEnd={state.preferences.dayEnd}
+          events={state.events} activities={state.activities}
+          onEvent={setEditing} onItem={setViewing}
+        />
+      )}
 
       <div className="legend" style={{ margin: '14px 4px 18px' }}>
         <span><i style={{ background: 'var(--text-2)' }} />Compromisso fixo</span>
@@ -91,7 +104,7 @@ export function CalendarPage() {
 
       {editing && (
         <EventForm
-          event={editing === 'new' ? undefined : editing} defaultDate={selectedDay}
+          event={editing === 'new' ? undefined : editing} defaultDate={dates.includes(today) ? today : dates[0]}
           onClose={() => setEditing(null)}
           onSave={(events) => { saveEvents(events); setEditing(null) }}
           onDelete={editing === 'new' ? undefined : () => { removeEvent(editing.id); setEditing(null) }}

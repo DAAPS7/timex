@@ -16,7 +16,13 @@ async function run(provider: AIProvider, req: AssistantRequest): Promise<Assista
   // A fresh tool runner per attempt, so a failed attempt cannot leave half-made drafts behind.
   const tools = createToolRunner(req.state, req.currentItems)
   const reply = await provider.respond(req.message, tools, { today: req.state.today })
-  return { reply, proposals: tools.proposals, plan: tools.plan, planAdoptable: !!tools.plan && !tools.hasDrafts }
+  return {
+    reply,
+    proposals: tools.proposals,
+    plan: tools.plan,
+    planWeekStart: tools.planWeekStart,
+    planAdoptable: !!tools.plan && !tools.hasDrafts,
+  }
 }
 
 export async function handleAssistantMessage(

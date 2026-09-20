@@ -1,3 +1,4 @@
+import { nowLocalMinutes, todayLocal } from '../../shared/time'
 import type { Activity, CalendarEvent, Goal, PlanningInput, ProposedAction, ScheduledItem } from '../../shared/domain'
 import type { AppState } from '../state/store'
 
@@ -9,6 +10,7 @@ export const buildPlanningInput = (state: AppState, weekStart: string, today: st
   activities: state.activities,
   goals: state.goals,
   preferences: state.preferences,
+  ...(today === todayLocal() ? { nowMinutes: nowLocalMinutes() } : {}),
   ...(previousItems && previousItems.length > 0 ? { previousItems } : {}),
 })
 

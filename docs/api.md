@@ -19,7 +19,8 @@ Authentication is a session cookie (`timex_session`, HttpOnly) set by register/l
 | POST | `/api/assistant/message` 🔒 | `{ message, state: PlanningInput, currentItems? }` | `{ reply, proposals[], plan?, planAdoptable? }` |
 
 `PlanningResult`: `status` (`fully_feasible` \| `partially_feasible` \| `infeasible`), minute totals,
-`scheduledItems[]` (each with structured `reasons` codes), `conflicts[]`, `warnings[]`, `availableMinutesByDay`.
+`scheduledItems[]` (each with structured `reasons` codes), `conflicts[]`, `warnings[]`, `availableMinutesByDay` (free before planning) and `freeMinutesByDay` (still free after the sessions).
+The input may carry `nowMinutes`: the time already gone today is not available. The assistant reply may carry `plan` + `planWeekStart`: a weekly plan that is only a proposal until the user approves it.
 
 Planned resource endpoints from CLAUDE.md §15 (`/api/activities`, `/api/goals`, `/api/calendar/events`,
 `/api/plans/current`, `/api/plans/:id/modify`) arrive together with the database.

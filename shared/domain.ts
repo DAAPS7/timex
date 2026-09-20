@@ -48,11 +48,21 @@ export type Goal = z.infer<typeof goalSchema>
 export const transportModeSchema = z.enum(['walk', 'bike', 'bus', 'train', 'car'])
 export type TransportMode = z.infer<typeof transportModeSchema>
 
-// Daily round-trip time lost in transport. The engine reserves it before the first / after the last fixed commitment.
-export const commuteSchema = z.object({
-  mode: transportModeSchema,
-  minutesPerDay: z.number().int().min(0).max(300),
-})
+// Daily round-trip time lost in transport, by one or more modes (e.g. walk + train). The engine reserves it before the
+// first / after the last fixed commitment. Data saved with the former single `mode` is upgraded on read.
+export const commuteSchema = z.preprocess(
+  (v) => {
+    if (v && typeof v === 'object' && 'mode' in v && !('modes' in v)) {
+      const { mode, ...rest } = v as { mode: unknown }
+      return { ...rest, modes: [mode] }
+    }
+    return v
+  },
+  z.object({
+    modes: z.array(transportModeSchema).min(1).max(5),
+    minutesPerDay: z.number().int().min(0).max(300),
+  }),
+)
 export type Commute = z.infer<typeof commuteSchema>
 
 export const preferencesSchema = z.object({
@@ -96,6 +106,8 @@ export const planningInputSchema = z.object({
   preferences: preferencesSchema,
   // The plan being revised: sessions that are still valid are kept, only the affected ones move (stable replanning).
   previousItems: z.array(scheduledItemSchema).max(500).optional(),
+  // Minutes since midnight of `today` at request time: what has already elapsed today is not free time any more.
+  nowMinutes: z.number().int().min(0).max(1439).optional(),
 })
 export type PlanningInput = z.infer<typeof planningInputSchema>
 
@@ -124,7 +136,7 @@ export interface CommuteBlock {
   date: string
   start: string
   end: string
-  mode: TransportMode
+  modes: TransportMode[]
 }
 
 // What a stable replan did to the previous plan, so the change can be shown and explained.
@@ -144,7 +156,8 @@ export interface PlanningResult {
   scheduledItems: ScheduledItem[]
   conflicts: Conflict[]
   warnings: Warning[]
-  availableMinutesByDay: Record<string, number>
+  availableMinutesByDay: Record<string, number> // free before planning: waking hours minus events, commute and elapsed time
+  freeMinutesByDay: Record<string, number> // still free after the planned sessions
   commuteBlocks?: CommuteBlock[]
   changes?: PlanChanges // only when the plan was built from previousItems
 }
@@ -173,6 +186,7 @@ export interface AssistantReply {
   proposals: ProposedAction[]
   plan?: PlanningResult // set when the assistant ran the planning engine
   planAdoptable?: boolean // false when the plan includes hypothetical (unapplied) activities
+  planWeekStart?: string // the week `plan` is for (this week or the next one)
 }
 
 export const assistantRequestSchema = z.object({

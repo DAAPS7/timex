@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Activity, CalendarEvent, PlanningInput } from '../../../shared/domain'
+import { preferencesSchema, type Activity, type CalendarEvent, type PlanningInput } from '../../../shared/domain'
 import { generatePlan } from './engine'
 
 const WEEK = '2026-09-14' // a Monday
@@ -20,15 +20,15 @@ describe('commute', () => {
   const withCommute = (o: Partial<PlanningInput> = {}) =>
     input({
       events: [event({ id: 'uni', weekly: true, start: '09:00', end: '17:00' })],
-      preferences: { ...input().preferences, commute: { mode: 'bus', minutesPerDay: 60 } },
+      preferences: { ...input().preferences, commute: { modes: ['bus'], minutesPerDay: 60 } },
       ...o,
     })
 
   it('reserves half before the first and half after the last fixed commitment, only on days that have one', () => {
     const blocks = generatePlan(withCommute()).commuteBlocks!.filter((b) => b.date === WEEK)
     expect(blocks).toEqual([
-      { date: WEEK, start: '08:30', end: '09:00', mode: 'bus' },
-      { date: WEEK, start: '17:00', end: '17:30', mode: 'bus' },
+      { date: WEEK, start: '08:30', end: '09:00', modes: ['bus'] },
+      { date: WEEK, start: '17:00', end: '17:30', modes: ['bus'] },
     ])
     // the event is weekly on Mondays only: Tuesday has none
     expect(generatePlan(withCommute()).commuteBlocks!.filter((b) => b.date === '2026-09-15')).toEqual([])
@@ -94,5 +94,49 @@ describe('stable replanning', () => {
     const revised = generatePlan(input({ activities: [activity({ id: 'gym' })], events, previousItems: previous }))
     expect(revised.changes!.dropped).toEqual(previous)
     expect(revised.status).toBe('infeasible')
+  })
+})
+
+describe('free time', () => {
+  it('does not count the part of today that has already gone by', () => {
+    const full = generatePlan(input()).availableMinutesByDay[WEEK]
+    const noon = generatePlan(input({ nowMinutes: 12 * 60 })).availableMinutesByDay[WEEK]
+    expect(full).toBe(14 * 60)
+    expect(noon).toBe(10 * 60)
+  })
+
+  it('reports what is still free after the planned sessions, and leaves future days alone', () => {
+    const plan = generatePlan(input({ activities: [activity({ id: 'gym', sessionsPerWeek: 1, sessionMinutes: 60 })] }))
+    const day = plan.scheduledItems[0].date
+    expect(plan.freeMinutesByDay[day]).toBe(plan.availableMinutesByDay[day] - 60)
+    const other = Object.keys(plan.freeMinutesByDay).find((d) => d !== day)!
+    expect(plan.freeMinutesByDay[other]).toBe(plan.availableMinutesByDay[other])
+  })
+
+  it('a later week in the same request still has all its time', () => {
+    const next = generatePlan(input({ weekStart: '2026-09-21', today: '2026-09-20', nowMinutes: 20 * 60 }))
+    expect(Object.values(next.availableMinutesByDay).every((m) => m === 14 * 60)).toBe(true)
+  })
+})
+
+describe('several transport modes', () => {
+  it('reserves one commute for a combination of modes', () => {
+    const modes = ['walk', 'train'] as const
+    const plan = generatePlan(
+      input({
+        events: [event({ id: 'uni', weekly: true, start: '09:00', end: '17:00' })],
+        preferences: { ...input().preferences, commute: { modes: [...modes], minutesPerDay: 60 } },
+      }),
+    )
+    expect(plan.commuteBlocks![0].modes).toEqual(['walk', 'train'])
+  })
+
+  it('upgrades stored data that has a single mode', () => {
+    const parsed = preferencesSchema.parse({ ...input().preferences, commute: { mode: 'bus', minutesPerDay: 45 } })
+    expect(parsed.commute).toEqual({ modes: ['bus'], minutesPerDay: 45 })
+  })
+
+  it('needs at least one mode', () => {
+    expect(preferencesSchema.safeParse({ ...input().preferences, commute: { modes: [], minutesPerDay: 45 } }).success).toBe(false)
   })
 })

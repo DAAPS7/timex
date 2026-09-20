@@ -4,19 +4,22 @@ import { useStore } from '../state/store'
 import { usePlanning } from './usePlanning'
 
 /**
- * Every week gets a plan without the user asking: when a week has none (and is not in the past) a proposal is
+ * Every visible week gets a plan without the user asking: when a week has none (and is not in the past) a proposal is
  * generated for it. Each week is tried once per session, so a failing request cannot loop.
  */
-export function useAutoPlan(weekStart: string, enabled = true) {
+export function useAutoPlan(weekStarts: string[], enabled = true) {
   const { state } = useStore()
   const { generate } = usePlanning()
   const tried = useRef(new Set<string>())
-  const hasPlan = !!state.plans[weekStart]
   const canPlan = enabled && state.activities.length > 0
+  const key = weekStarts.join(',')
 
   useEffect(() => {
-    if (hasPlan || !canPlan || addDays(weekStart, 6) < todayLocal() || tried.current.has(weekStart)) return
-    tried.current.add(weekStart)
-    void generate(weekStart)
-  }, [weekStart, hasPlan, canPlan, generate])
+    if (!canPlan) return
+    for (const week of key.split(',')) {
+      if (state.plans[week] || addDays(week, 6) < todayLocal() || tried.current.has(week)) continue
+      tried.current.add(week)
+      void generate(week)
+    }
+  }, [key, canPlan, state.plans, generate])
 }

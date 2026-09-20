@@ -9,7 +9,9 @@ export interface ChatMessage {
   proposals?: ProposedAction[]
   plan?: PlanningResult
   planAdoptable?: boolean // the plan was built from real data only (no hypothetical activities)
-  handled?: boolean // the user already applied the proposals / adopted the plan
+  handled?: boolean // the user already applied the proposals
+  planWeekStart?: string // the week the plan is for
+  planDecision?: 'approved' | 'rejected' // the user's answer to the proposed weekly plan
 }
 
 export interface AppState {
@@ -34,6 +36,7 @@ export type Action =
   | { type: 'removeScheduledItem'; weekStart: string; itemId: string }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'markHandled'; messageId: string }
+  | { type: 'decidePlan'; messageId: string; decision: 'approved' | 'rejected' }
   | { type: 'replace'; state: AppState }
 
 const upsert = <T extends { id: string }>(list: T[], item: T): T[] =>
@@ -68,6 +71,8 @@ function reducer(s: AppState, a: Action): AppState {
     case 'chat': return { ...s, chat: [...s.chat, a.message].slice(-60) }
     case 'markHandled':
       return { ...s, chat: s.chat.map((m) => (m.id === a.messageId ? { ...m, handled: true } : m)) }
+    case 'decidePlan':
+      return { ...s, chat: s.chat.map((m) => (m.id === a.messageId ? { ...m, planDecision: a.decision } : m)) }
     case 'replace': return a.state
   }
 }

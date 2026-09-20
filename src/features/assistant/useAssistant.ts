@@ -20,7 +20,7 @@ export function useAssistant() {
     try {
       const items = state.plans[weekStart]?.result.scheduledItems
       const r = await assistantApi.send(message, buildPlanningInput(state, weekStart, todayLocal()), items)
-      dispatch({ type: 'chat', message: { id: newId('m'), role: 'assistant', text: r.reply, proposals: r.proposals, plan: r.plan, planAdoptable: r.planAdoptable } })
+      dispatch({ type: 'chat', message: { id: newId('m'), role: 'assistant', text: r.reply, proposals: r.proposals, plan: r.plan, planAdoptable: r.planAdoptable, planWeekStart: r.planWeekStart } })
     } catch (e) {
       dispatch({ type: 'chat', message: { id: newId('m'), role: 'assistant', text: e instanceof Error ? e.message : 'Algo correu mal.' } })
     } finally {
@@ -37,14 +37,17 @@ export function useAssistant() {
       else dispatch({ type: 'upsertEvent', event: p.payload })
     }
     // a plan is already on screen: keep what still works and move only what the new items disturb
-    await generate(weekStart, applyProposals(state, m.proposals ?? []), { stable: true })
+    await generate(m.planWeekStart ?? weekStart, applyProposals(state, m.proposals ?? []), { stable: true })
   }
 
-  const adoptPlan = (m: ChatMessage) => {
+  // The assistant only proposes a weekly plan; it enters the calendar as accepted when the user approves it.
+  const approvePlan = (m: ChatMessage) => {
     if (!m.plan) return
-    dispatch({ type: 'markHandled', messageId: m.id })
-    adopt(weekStart, m.plan)
+    dispatch({ type: 'decidePlan', messageId: m.id, decision: 'approved' })
+    adopt(m.planWeekStart ?? weekStart, m.plan, 'accepted')
   }
 
-  return { send, applyAndPlan, adoptPlan, busy }
+  const rejectPlan = (m: ChatMessage) => dispatch({ type: 'decidePlan', messageId: m.id, decision: 'rejected' })
+
+  return { send, applyAndPlan, approvePlan, rejectPlan, busy }
 }

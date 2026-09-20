@@ -30,6 +30,12 @@ export const todayLocal = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** Minutes since local midnight. */
+export const nowLocalMinutes = (): number => {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
+}
+
 export const formatDuration = (minutes: number): string => {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60

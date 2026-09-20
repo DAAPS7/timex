@@ -79,6 +79,14 @@ export function generatePlan(input: PlanningInput): PlanningResult {
   const free = computeAvailability(input, commuteBlocks)
   const originalFree = structuredClone(free)
   const availableMinutesByDay = Object.fromEntries(dates.map((d) => [d, sumMinutes(free[d])]))
+  // Free time left after planning: what was available minus the sessions that sit inside it (past sessions do not count).
+  const freeMinutesByDay = (): Record<string, number> =>
+    Object.fromEntries(
+      dates.map((d) => {
+        const planned = placed.filter((p) => p.date === d).map((p) => ({ start: p.start, end: p.end }))
+        return [d, sumMinutes(subtractIntervals(originalFree[d], planned))]
+      }),
+    )
   const breakMinutes = input.preferences.minBreakMinutes
   const maxDaily = input.preferences.maxDailyPlannedMinutes
 
@@ -181,6 +189,7 @@ export function generatePlan(input: PlanningInput): PlanningResult {
     conflicts,
     warnings: detectOverlappingEvents(input.events, dates),
     availableMinutesByDay,
+    freeMinutesByDay: freeMinutesByDay(),
     commuteBlocks,
     ...(input.previousItems ? { changes: describeChanges(items, keptIds, removed, input.today) } : {}),
   }

@@ -5,7 +5,7 @@
 **Decision.**
 - **Routine as data.** Fixed commitments are recurring calendar events (`weekly: true`); sleep is the complement of the waking window
   (`dayStart` = wake-up, `dayEnd` = bedtime, and a bedtime at or before wake-up means "after midnight", see `shared/routine.ts`);
-  transport is `preferences.commute = { mode, minutesPerDay }`. All are optional, so stored data stays valid.
+  transport is `preferences.commute = { modes[], minutesPerDay }` (one or more modes; data saved with the former single `mode` is upgraded on read). All are optional, so stored data stays valid.
 - **Commute is reserved by the engine.** On days with at least one recurring commitment, half of `minutesPerDay` is blocked right before the
   first and half right after the last (clamped to waking hours). The blocks are returned as `commuteBlocks` so the UI can draw them.
 - **Stable replanning.** `PlanningInput.previousItems` is the plan being revised. Sessions of past days, and future sessions that still fit,
